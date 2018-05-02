@@ -21,10 +21,7 @@
 
 'use strict';
 
-const applicationServerPublicKey = 'BGMeVcjH0y_iR0SRWCk1-61hIAGb7Yh4ZEnGTuVxFIxpYFmV9gkxBACfqtvKfX-5kHLhG3BLn8uRN0CQv1JyLoc';
-// from https://web-push-codelab.glitch.me/
-// private key: m-EAwerjvKyfGr394t1X9hEY00vWYireDwxdbmq0ovA
-
+const applicationServerPublicKey = 'BFzhXP5G5Pp5xmEfESPsd7L6N2oQZZypGd2tUR5diW9spzJFs5DXaUuM1iMVfZGunUhtHkyYjqPfcQ2bfzKzbeY';
 
 const pushButton = document.querySelector('.js-push-btn');
 
