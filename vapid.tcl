@@ -1,4 +1,3 @@
-package require tcltest
 package require uri
 
 #
@@ -7,6 +6,7 @@ package require uri
 #
 
 set ::vapidCertPath "[ns_info home]/modules/vapid"
+set ::testSuite "[ns_info home]/pages/pushnotificationsapi/TestSuite.tcl"
 
 if {![file exists $::vapidCertPath/prime256v1_key.pem]} {
     #
@@ -26,8 +26,8 @@ if {![file exists $::vapidCertPath/prime256v1_key.pem]} {
 if {![file exists $::vapidCertPath/public_key.txt]} {
     cd $::vapidCertPath
     ns_log notice ".... extracting .txt files"
-    exec -ignorestderr openssl ec -in prime256v1_key.pem -pubout -outform DER | tail -c 65 | base64 | tr -d '=' | tr '/+' '_-' > public_key.txt
-    exec -ignorestderr openssl ec -in prime256v1_key.pem -outform DER | tail -c +8 | head -c 32 | base64 | tr -d '=' | tr '/+' '_-' > private_key.txt
+    exec -ignorestderr openssl ec -in prime256v1_key.pem -pubout -outform DER | tail -c 65 | base64 | tr -d '=' | tr '/+' '-_' > public_key.txt
+    exec -ignorestderr openssl ec -in prime256v1_key.pem -outform DER | tail -c +8 | head -c 32 | base64 | tr -d '=' | tr '/+' '-_' > private_key.txt
 }
 
 proc stripWhitespacesNewlines {str} {
@@ -60,20 +60,62 @@ proc vapidToken {string} {
 # "exp" will be set to +24hours from the time of the function call if not provided
 #
 # private_key is the path to a pem file containing a VAPID EC private key
-proc webpush {subscription data claim private_key} {
-  puts webpush
-  puts [subst  {"subscr: $subscription"}]
-  puts [subst  {"data: $data"}]
-  puts [subst  {"claim: $claim"}]
-  puts [subst  {"privatekey: $private_key"}]
-
+#
+# timeout is the timeout parameter of the push message (post request)
+#
+# ttl is the time to live of the push message
+proc webpush {subscription data claim private_key {timeout 2.0} {ttl 0}} {
+  # validate subscription
   if {[dict exists $subscription endpoint]} {
       set endpoint [dict get $subscription endpoint]
   } else {
     error "No endpoint information provided!"
   }
-  set $claim [validateClaim $claim $endpoint]
+  # validate private key and create public key in base64 encoded DER format
+  set public_key [getPublicKey $private_key]
+  # validate/fill claim
+  set claim [validateClaim $claim $endpoint]
+  # create a signed jwt token
+  set jwt [makeJWT $claim $private_key]
+  # create vapid-03 Authorization header
+  set authorization [subst {vapid t=$jwt,k=$public_key}]
+  set headers [ns_set create]
+  ns_set update $headers Authorization $authorization
+  ns_set update $headers TTL $ttl
+  # queue the request
+  set req [ns_http queue -method POST \
+     -headers $headers \
+     -timeout $timeout \
+     $endpoint]
+  set replyHeaders [ns_set create]
+  # wait for answer of push service and record reply
+  ns_http wait -result result -headers $replyHeaders -status status $req
+  if {$status > 202} {
+    error "Webpush failed!" $result $status
+  }
+  return $status
 }
+
+#
+# takes the path to a pem file of an SECP256 private key and
+# creates a dervied public key
+#
+# throws an exception if the file does not exist or is a wrong format
+#
+# returns the public key in base64 encoded DER format
+proc getPublicKey {private_key_pem} {
+  if {![file exists $private_key_pem]} {
+    error "$private_key_pem does not exist!"
+  }
+  if {[catch {
+        set pubkey [string map {\n {}}\
+        [exec -ignorestderr openssl ec -in $private_key_pem -pubout -outform DER | tail -c 65 | base64 | tr -d '=' | tr '/+' '-_']]
+        }]} {
+    error "$private_key_pem not a valid private key pem file"
+  }
+  return $pubkey
+}
+
 #
 # validates the contents of a claim and fills the "aud" and "exp" fields if not present
 # validates the "aud" field against the endpoint
@@ -81,9 +123,6 @@ proc webpush {subscription data claim private_key} {
 #
 # returns a valid claim as a dict or throws an exception
 proc validateClaim {claim endpoint} {
-  puts validateClaim
-  puts [subst {"claim: $claim"}]
-  puts [subst {"endpoint: $endpoint"}]
   # validate 'sub'
   if {[dict exists $claim sub]} {
     set mail [::uri::split [dict get $claim sub]]
@@ -120,26 +159,53 @@ proc validateClaim {claim endpoint} {
       [expr $exp > ([clock seconds] + 60*60*24)]} {
       dict set claim exp [expr [clock seconds] + 59*60*24]
     }
+  } else {
+    dict set claim exp [expr [clock seconds] + 59*60*24]
   }
   return $claim
 }
+
+# takes a claim and the path to an EC private key and creates a
+# signed JWT token
+# whitespaces and newlines are stripped from the claim
+proc makeJWT {claim private_key_pem} {
+  # this is always the jwt header
+  set JWTHeader [ns_base64urlencode {{"typ":"JWT","alg":"ES256"}}]
+  # reformat claim dict to json
+  set JWTbody [ns_base64urlencode [dictToJson $claim]]
+
+  set signature [::ns_crypto::md vapidsign -digest sha256\
+   -encoding base64url -pem $private_key_pem $JWTHeader.$JWTbody ]
+  return $JWTHeader.$JWTbody.$signature
+}
+
+# serializes a dict to json
+# no testing for nested dicts or arrays, these will be simply added as a string
+# the json is in compact form,
+# meaning no whitespaces and newlines between keys/values
+proc dictToJson {dict} {
+  set retJson "{"
+  dict for {key value} $dict {
+    append retJson [subst {"$key":"$value",}]
+  }
+  return [string range $retJson 0 end-1]}
+}
+
+
 
 
 set claim [subst {
   {
   "sub" : "mailto:h0325904@wu.ac.at",
-  "aud" : "https://updates.push.services.mozilla.com",
+  "aud" : "https://updates.push.services.mozilla.com/",
   "exp" : "[expr [clock seconds] + 60*120]"
   }
 }]
 
-
-# this is always the jwt header
+# the JWT base string is the header and body separated with a "."
 set JWTHeader [ns_base64urlencode {{"typ":"JWT","alg":"ES256"}}]
-puts [stripWhitespacesNewlines $claim]
 set JWTbody [ns_base64urlencode [stripWhitespacesNewlines $claim]]
 
-# the JWT base string is the header and body separated with a "."
 set token [vapidToken $JWTHeader.$JWTbody]
 ns_log notice "VAPID token: <$token>"
 
@@ -155,63 +221,7 @@ set f [open $::vapidCertPath/prime256v1_key.pem]
 set pem [read $f]
 close $f
 
-namespace eval ::Test {
-    namespace import ::tcltest::*
-
-    # check if "exp" is correctly replaced
-    test validateClaim {} -body {
-      set validMail {mailto:georg@test.com}
-      # this is only a valid formatting, the endpoint does not exist
-      set validEndpoint "https://updates.push.services.mozilla.com/wpush/v2/gAAAAABa6CXAoHisP"
-
-      set claim [validateClaim [subst {sub $validMail exp 12345}] $validEndpoint]
-      set exp [dict get $claim exp]
-      set result [expr [clock seconds] < $exp && $exp < [expr [clock seconds] + 60*61*24]]
-
-      set claim [validateClaim [subst {sub $validMail exp [expr [clock seconds] + 60*60*27]}] $validEndpoint]
-      set exp [dict get $claim exp]
-      append result [expr [clock seconds] < $exp && $exp < [expr [clock seconds] + 60*61*24]]
-      set aud [dict get $claim aud]
-      if {$aud eq "https://updates.push.services.mozilla.com/"} {
-        append result 1
-      }
-    } -result {111}
-
-    test webpush-exceptions {} -body {
-      set validMail {mailto:georg@test.com}
-      # this is only a valid formatting, the endpoint does not exist
-      set validEndpoint {endpoint https://updates.push.services.mozilla.com/wpush/v2/gAAAAABa6CXAoHisP}
-      set validPem $::vapidCertPath/prime256v1_key.pem
-
-      # all wrong
-      set result [catch {webpush a "" "" ""}]
-      # missing private key
-      append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] ""}]
-      # invalid email adress
-      append result [catch {webpush $validEndpoint "" {sub mailto:test@test} $validPem}]
-      # endpoint and 'aud' missmatch
-      append result [catch {webpush $validEndpoint "" [subst {sub $validMail aud "abc"}] $validPem}]
-    } -result {1111}
-
-    test webpush-cannotconnect {} -body {
-      set validMail {mailto:georg@test.com}
-      # this is only a valid formatting, the endpoint does not exist
-      set validEndpoint {endpoint https://updates.push.services.mozilla.com/wpush/v2/gAAAAABa6CXAoHisP}
-      set validPem $::vapidCertPath/prime256v1_key.pem
-      # all good (no data is ok) - expected result is error 404 cannot connect
-      catch {webpush $validEndpoint "" [subst {sub $validMail}] $validPem} msg opt
-      set result [dict get $opt -errorcode]
-      # all good (valid aud)
-      catch {webpush $validEndpoint "" [subst {sub $validMail aud "https://updates.push.services.mozilla.com/"}] $validPem} msg opt
-      append result [dict get $opt -errorcode]
-      # all good (valid exp)
-      catch {webpush $validEndpoint "" [subst {sub $validMail exp [expr [clock seconds] + 60*120]}] $validPem} msg opt
-      append result [dict get $opt -errorcode]
-    } -result {404404404}
-    cleanupTests
-}
-namespace delete ::Test
-
+source $::testSuite
 
 ns_return 200 text/plain [subst {
     claim:
