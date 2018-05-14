@@ -65,6 +65,9 @@ proc vapidToken {string} {
 #
 # ttl is the time to live of the push message
 proc webpush {subscription data claim private_key {timeout 2.0} {ttl 0}} {
+  if {$data ne ""} {
+    error "not implemented yet"
+  }
   # validate subscription
   if {[dict exists $subscription endpoint]} {
       set endpoint [dict get $subscription endpoint]
@@ -114,6 +117,59 @@ proc getPublicKey {private_key_pem} {
     error "$private_key_pem not a valid private key pem file"
   }
   return $pubkey
+}
+
+# creates a new EC private key pem file at the given location
+# overwrites the file if it exists
+# returns the path if successfull
+proc createPrivateKeyPem {path} {
+  if {[file exists $path]} {
+    file delete -force $path
+  }
+  if {[catch {
+    exec -ignorestderr openssl ecparam -genkey -name prime256v1 -out $path
+  }]} {
+    error "Could not generate new private key"
+  }
+  return $path
+}
+
+# creates a public key pem file at the location specified in path
+# derived from the private key pem file specified in privkey
+# overwrites the file if it exists
+# returns the path if successfull
+proc createPublicKeyPem {path privkey} {
+  if {[file exists $path]} {
+    file delete -force $path
+  }
+  if {[catch {
+    exec -ignorestderr openssl ec -in $privkey -pubout -out $path
+  }]} {
+    error "Could not generate public key"
+  }
+  return $path
+}
+
+# takes a key in base64url save DER format as a string and creates
+# a new file at the location specified in path containing the same
+# key in PEM format
+# returns the path if successfull
+proc base64urlDerToPem {path key} {
+  # write the key in der format to a helper file
+  set helper $::vapidCertPath/DerToPemHelper.der
+  if {[file exists $helper]} {
+    file delete -force $helper
+  }
+  set helper_f [open $helper w]
+  puts $helper_f [ns_base64urldecode $key]
+  close $helper_f
+  # convert the file using openSSL
+  if {[catch {
+    exec -ignorestderr openssl ec -in $helper -inform DER -out $path -outform PEM
+  }]} {
+    error "Could not convert key ($key) to pem file"
+  }
+  return $path
 }
 
 #
@@ -177,6 +233,19 @@ proc makeJWT {claim private_key_pem} {
   set signature [::ns_crypto::md vapidsign -digest sha256\
    -encoding base64url -pem $private_key_pem $JWTHeader.$JWTbody ]
   return $JWTHeader.$JWTbody.$signature
+}
+
+# encrypts the data using the auth secret and p256dh fields
+# of a subscription
+# auth is the shared secret
+# p256dh is the client (or subscription) public key
+proc encrypt {data auth p256dh} {
+  # the first step is to create a new private/public keypair
+  # this needs to be generated for every subscription update
+  # currently done via openSSL commandline and pem files
+  set local_private_key [createPrivateKeyPem $::vapidCertPath/local_private_key.pem]
+  set local_public_key [createPublicKeyPem $::vapidCertPath/local_public_key.pem]
+  set shared_secret [deriveSharedSecret $local_private_key]
 }
 
 # serializes a dict to json
