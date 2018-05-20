@@ -117,6 +117,11 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXOFc/kbk+nnGYR8RI+x3svo3ahBl
 nKkZ3a1RHl2Jb2ynMkWzkNdpS4zWIxV9ka6dSG0eTJiOo99xDZt/MrNt5g==
 -----END PUBLIC KEY-----}
 
+    test generateInfo {} -body {
+      set result [string map {"\n" {}} [ns_base64encode \
+        [generateInfo aesgcm BJkXi48PlCiNCs9dLggxXQ39bdi64agt_emycss5gsg5BYqOWwP5gnbmga7Rg1_tKvnu0c3InK0C850s1czzyBg BJZRgas6kMag9rP2X5oVVhGzPwwT24p103WKkPlB7jFTmYVA3QsuLBaSSxNO-UVU-0SjHo0uIsiNoFQRYLDt7cE]]]
+    } -result {Q29udGVudC1FbmNvZGluZzogYWVzZ2NtAFAtMjU2AABBBJkXi48PlCiNCs9dLggxXQ39bdi64agt/emycss5gsg5BYqOWwP5gnbmga7Rg1/tKvnu0c3InK0C850s1czzyBgAQQSWUYGrOpDGoPaz9l+aFVYRsz8ME9uKddN1ipD5Qe4xU5mFQN0LLiwWkksTTvlFVPtEox6NLiLIjaBUEWCw7e3B}
+
     cleanupTests
 }
 namespace delete ::Test

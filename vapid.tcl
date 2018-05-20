@@ -110,13 +110,7 @@ proc getPublicKey {private_key_pem} {
   if {![file exists $private_key_pem]} {
     error "$private_key_pem does not exist!"
   }
-  if {[catch {
-        set pubkey [string map {\n {}}\
-        [exec -ignorestderr openssl ec -in $private_key_pem -pubout -outform DER | tail -c 65 | base64 | tr -d '=' | tr '/+' '-_']]
-        }]} {
-    error "$private_key_pem not a valid private key pem file"
-  }
-  return $pubkey
+  return [ns_crypto::eckey pub -pem $private_key_pem -encoding base64url]
 }
 
 # creates a new EC private key pem file at the given location
@@ -126,11 +120,7 @@ proc createPrivateKeyPem {path} {
   if {[file exists $path]} {
     file delete -force $path
   }
-  if {[catch {
-    exec -ignorestderr openssl ecparam -genkey -name prime256v1 -out $path
-  }]} {
-    error "Could not generate new private key"
-  }
+  ns_crypto::eckey generate -name prime256v1 -pem $path
   return $path
 }
 
@@ -155,21 +145,61 @@ proc createPublicKeyPem {path privkey} {
 # key in PEM format
 # returns the path if successfull
 proc base64urlDerToPem {path key} {
+  set rndPubDer [open $::vapidCertPath/DT_pub.der]
+  fconfigure $rndPubDer -translation binary
+  # the prefix are the first 26 bytes
+  set derPrefix [string range [read $rndPubDer] 0 25]
+  # add prefix and decode key
+  set key $derPrefix[ns_base64urldecode $key]
   # write the key in der format to a helper file
   set helper $::vapidCertPath/DerToPemHelper.der
   if {[file exists $helper]} {
     file delete -force $helper
   }
   set helper_f [open $helper w]
-  puts $helper_f [ns_base64urldecode $key]
+  fconfigure $helper_f -translation binary
+  puts -nonewline $helper_f $key
   close $helper_f
   # convert the file using openSSL
   if {[catch {
     exec -ignorestderr openssl ec -in $helper -inform DER -out $path -outform PEM
   }]} {
-    error "Could not convert key ($key) to pem file"
+    error "Could not convert key to pem file"
   }
   return $path
+}
+
+# generate the key/nonce info from the clients public key and servers private key
+# type should be 'aesgcm' or 'nonce'
+# keys are expected in base64url 65 byte format
+# returns info in binary format
+proc generateInfo {type clientPubKey serverPrivKey} {
+  # This is how the info should look like
+  # value               | length | start    |
+  # -----------------------------------------
+  # 'Content-Encoding: '| 18     | 0        |
+  # type                | len    | 18       |
+  # nul byte            | 1      | 18 + len |
+  # 'P-256'             | 5      | 19 + len |
+  # nul byte            | 1      | 24 + len |
+  # client key length   | 2      | 25 + len |
+  # client key          | 65     | 27 + len |
+  # server key length   | 2      | 92 + len |
+  # server key          | 65     | 94 + len |
+  # For the purposes of push encryption the length of the keys will
+  # always be 65 bytes.
+
+  set info [binary format A18 "Content-Encoding: "]
+  append info [binary format A* $type]
+  append info [binary format x]
+  append info [binary format A5 "P-256"]
+  append info [binary format x]
+  append info [binary format S1 65]
+  append info [ns_base64urldecode $clientPubKey]
+  append info [binary format S1 65]
+  append info [ns_base64urldecode $serverPrivKey]
+
+  return $info
 }
 
 #
