@@ -65,40 +65,78 @@ proc vapidToken {string} {
 #
 # ttl is the time to live of the push message
 proc webpush {subscription data claim private_key_pem {timeout 2.0} {ttl 0}} {
-  if {$data ne ""} {
-    error "not implemented yet"
-  }
   # validate subscription
   if {[dict exists $subscription endpoint]} {
       set endpoint [dict get $subscription endpoint]
   } else {
     error "No endpoint information provided!"
   }
-  # data bearing subscriptions need "auth" and "p256dh" fields for encryption
-  if {data ne {}} {
-    if {![dict exists $subscription auth] || ![dict exists $subscription p256dh]} {
-      error "Data bearing push messages need auth and p256dh fields in subscription"
-    }
-  }
   # validate private key and create public key in base64url encoded format
-  set public_key [ns_crypto::eckey pub -pem $private_key_pem -encoding base64url]
+  set server_public_key [ns_crypto::eckey pub -pem $private_key_pem -encoding base64url]
   # validate/fill claim
   set claim [validateClaim $claim $endpoint]
   # create a signed jwt token
   set jwt [makeJWT $claim $private_key_pem]
-  # create vapid-03 Authorization header
-  set authorization [subst {vapid t=$jwt,k=$public_key}]
+  # create vapid Authorization header
+  set authorization "WebPush $jwt"
+  # the crypto key header contains the server public key
+  set cryptokey p256ecdsa=$server_public_key
+  # start creating headers
   set headers [ns_set create]
   ns_set update $headers Authorization $authorization
+  ns_set update $headers Crypto-Key $cryptokey
   ns_set update $headers TTL $ttl
-  # queue the request
-  set req [ns_http queue -method POST \
-     -headers $headers \
-     -timeout $timeout \
-     $endpoint]
+  # data bearing push messages need "auth" and "p256dh" fields for encryption
+  if {$data ne {}} {
+    if {![dict exists $subscription auth] || ![dict exists $subscription p256dh]} {
+      error "Data bearing push messages need auth and p256dh fields in subscription"
+    }
+    # for each data bearing push messages a new local private key needs to be created
+    set localPrivateKeyPem [createPrivateKeyPem $::vapidCertPath/temp_encryption_priv.pem]
+    set localPubKey [ns_crypto::eckey pub -pem $localPrivateKeyPem -encoding base64url]
+    # public key used for encryption needs to be appended to the crypt-key header.
+    # The keyid field links the Crypto-Key header with the Encryption header.
+    # It is not strictly required, but some push services may expect it.
+    append cryptokey ";dh=$localPubKey;keyid=p256dh"
+    ns_set update $headers Crypto-Key $cryptokey
+    # the Encryption header contains the salt which is a 16 byte (128bit) random value
+    # also used for encryption encoded in base64url format
+    set randomBits {}
+    for {set i 0} {$i < 128} {incr i} {
+      append randomBits [ns_rand 2]
+    }
+    set salt [binary format b128 $randomBits]
+    set encryption "keyid=p256dh;salt=[ns_base64urlencode $salt]"
+    ns_set update $headers Encryption $encryption
+    # set content-encoding and content-type headers
+    ns_set update $headers Content-Encoding aesgcm
+    ns_set update $headers Content-Type application/octet-stream
+    # encrypt the data
+    set encrData [encrypt $data \
+                          $localPrivateKeyPem \
+                          [ns_base64urldecode [dict get $subscription auth]] \
+                          [ns_base64urldecode [dict get $subscription p256dh]] \
+                          $salt]
+    # content-length header is the length of the encrypted data in bytes
+    ns_set update $headers Content-Length [string length $encrData]
+    # queue the request
+    set req [ns_http queue -method POST \
+       -headers $headers \
+       -timeout $timeout \
+       -body $encrData \
+       $endpoint]
+  } else {
+    # push messages without a payload do not have a request body
+    set req [ns_http queue -method POST \
+       -headers $headers \
+       -timeout $timeout \
+       $endpoint]
+  }
   set replyHeaders [ns_set create]
   # wait for answer of push service and record reply
   ns_http wait -result result -headers $replyHeaders -status status $req
+  puts $result
+  puts $status
   if {$status > 202} {
     error "Webpush failed!" $result $status
   }
@@ -233,25 +271,25 @@ proc createEncryptionKeyNonce {clientPubKey serverPubKey ikm salt} {
 # returns the encrypted message in binary format
 proc encrypt {data privKeyPem auth p256dh salt} {
   set ServerPubKey [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
-  puts "serverpubkey [ns_base64encode $ServerPubKey]"
+  # puts "serverpubkey [ns_base64encode $ServerPubKey]"
   set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $p256dh]
-  puts "sharedSecret [ns_base64encode $sharedSecret]"
+  #puts "sharedSecret [ns_base64encode $sharedSecret]"
   # make initial key material
   set authInfo [binary format A*x "Content-Encoding: auth"]
-  puts "authinfo [ns_base64encode $authInfo]"
+  #puts "authinfo [ns_base64encode $authInfo]"
   set ikm [ns_crypto::md hkdf -digest sha256 \
              -salt   $auth \
              -secret $sharedSecret \
              -info   $authInfo \
              -encoding binary \
               32]
-  puts "ikm [ns_base64encode $ikm]"
+  #puts "ikm [ns_base64encode $ikm]"
   # create encryption key and nonce
   set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt]
   set key [lindex $keyNonce 0]
-  puts "key [ns_base64encode $key]"
+  #puts "key [ns_base64encode $key]"
   set nonce [lindex $keyNonce 1]
-  puts "nonce [ns_base64encode $nonce]"
+  #puts "nonce [ns_base64encode $nonce]"
   # do encryption
   set cipher [::ns_crypto::enc string -cipher aes-128-gcm -iv $nonce -key $key $data]
   set result [dict get $cipher bytes][dict get $cipher tag]
