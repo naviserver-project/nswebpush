@@ -64,7 +64,7 @@ proc vapidToken {string} {
 # timeout is the timeout parameter of the push message (post request)
 #
 # ttl is the time to live of the push message
-proc webpush {subscription data claim private_key {timeout 2.0} {ttl 0}} {
+proc webpush {subscription data claim private_key_pem {timeout 2.0} {ttl 0}} {
   if {$data ne ""} {
     error "not implemented yet"
   }
@@ -74,12 +74,18 @@ proc webpush {subscription data claim private_key {timeout 2.0} {ttl 0}} {
   } else {
     error "No endpoint information provided!"
   }
-  # validate private key and create public key in base64 encoded DER format
-  set public_key [getPublicKey $private_key]
+  # data bearing subscriptions need "auth" and "p256dh" fields for encryption
+  if {data ne {}} {
+    if {![dict exists $subscription auth] || ![dict exists $subscription p256dh]} {
+      error "Data bearing push messages need auth and p256dh fields in subscription"
+    }
+  }
+  # validate private key and create public key in base64url encoded format
+  set public_key [ns_crypto::eckey pub -pem $private_key_pem -encoding base64url]
   # validate/fill claim
   set claim [validateClaim $claim $endpoint]
   # create a signed jwt token
-  set jwt [makeJWT $claim $private_key]
+  set jwt [makeJWT $claim $private_key_pem]
   # create vapid-03 Authorization header
   set authorization [subst {vapid t=$jwt,k=$public_key}]
   set headers [ns_set create]
@@ -98,21 +104,6 @@ proc webpush {subscription data claim private_key {timeout 2.0} {ttl 0}} {
   }
   return $status
 }
-
-#
-# takes the path to a pem file of an SECP256 private key and
-# creates a dervied public key
-#
-# throws an exception if the file does not exist or is a wrong format
-#
-# returns the public key in base64 encoded DER format
-proc getPublicKey {private_key_pem} {
-  if {![file exists $private_key_pem]} {
-    error "$private_key_pem does not exist!"
-  }
-  return [ns_crypto::eckey pub -pem $private_key_pem -encoding base64url]
-}
-
 # creates a new EC private key pem file at the given location
 # overwrites the file if it exists
 # returns the path if successfull
@@ -139,69 +130,6 @@ proc createPublicKeyPem {path privkey} {
   }
   return $path
 }
-
-# takes a key in base64url save DER format as a string and creates
-# a new file at the location specified in path containing the same
-# key in PEM format
-# returns the path if successfull
-proc base64urlDerToPem {path key} {
-  set rndPubDer [open $::vapidCertPath/DT_pub.der]
-  fconfigure $rndPubDer -translation binary
-  # the prefix are the first 26 bytes
-  set derPrefix [string range [read $rndPubDer] 0 25]
-  # add prefix and decode key
-  set key $derPrefix[ns_base64urldecode $key]
-  # write the key in der format to a helper file
-  set helper $::vapidCertPath/DerToPemHelper.der
-  if {[file exists $helper]} {
-    file delete -force $helper
-  }
-  set helper_f [open $helper w]
-  fconfigure $helper_f -translation binary
-  puts -nonewline $helper_f $key
-  close $helper_f
-  # convert the file using openSSL
-  if {[catch {
-    exec -ignorestderr openssl ec -in $helper -inform DER -out $path -outform PEM
-  }]} {
-    error "Could not convert key to pem file"
-  }
-  return $path
-}
-
-# generate the key/nonce info from the clients public key and servers private key
-# type should be 'aesgcm' or 'nonce'
-# keys are expected in base64url 65 byte format
-# returns info in binary format
-proc generateInfo {type clientPubKey serverPrivKey} {
-  # This is how the info should look like
-  # value               | length | start    |
-  # -----------------------------------------
-  # 'Content-Encoding: '| 18     | 0        |
-  # type                | len    | 18       |
-  # nul byte            | 1      | 18 + len |
-  # 'P-256'             | 5      | 19 + len |
-  # nul byte            | 1      | 24 + len |
-  # client key length   | 2      | 25 + len |
-  # client key          | 65     | 27 + len |
-  # server key length   | 2      | 92 + len |
-  # server key          | 65     | 94 + len |
-  # For the purposes of push encryption the length of the keys will
-  # always be 65 bytes.
-
-  set info [binary format A18 "Content-Encoding: "]
-  append info [binary format A* $type]
-  append info [binary format x]
-  append info [binary format A5 "P-256"]
-  append info [binary format x]
-  append info [binary format S1 65]
-  append info [ns_base64urldecode $clientPubKey]
-  append info [binary format S1 65]
-  append info [ns_base64urldecode $serverPrivKey]
-
-  return $info
-}
-
 #
 # validates the contents of a claim and fills the "aud" and "exp" fields if not present
 # validates the "aud" field against the endpoint
@@ -264,20 +192,71 @@ proc makeJWT {claim private_key_pem} {
    -encoding base64url -pem $private_key_pem $JWTHeader.$JWTbody ]
   return $JWTHeader.$JWTbody.$signature
 }
+# generate the key/nonce info according to specification from the
+# clients public key and servers private key
+# type should be 'aesgcm' or 'nonce'
+# keys are expected in binary format
+#
+# returns info in binary format
+proc generateInfo {type clientPubKey serverPubKey} {
+  set info [binary format A18 "Content-Encoding: "]
+  append info [binary format A* $type]
+  append info [binary format x]
+  append info [binary format A5 "P-256"]
+  append info [binary format x]
+  # length of keys are 65 bytes for webpush
+  append info [binary format S1 65]
+  append info $clientPubKey
+  append info [binary format S1 65]
+  append info $serverPubKey
 
-# encrypts the data using the auth secret and p256dh fields
-# of a subscription
-# auth is the shared secret
-# p256dh is the client (or subscription) public key
-proc encrypt {data auth p256dh} {
-  # the first step is to create a new private/public keypair
-  # this needs to be generated for every subscription update
-  # currently done via openSSL commandline and pem files
-  set local_private_key [createPrivateKeyPem $::vapidCertPath/local_private_key.pem]
-  set local_public_key [createPublicKeyPem $::vapidCertPath/local_public_key.pem]
-  set shared_secret [deriveSharedSecret $local_private_key]
+  return $info
 }
+# derives key and nonce from client public key, server public key, initial key material and salt
+# input parameters are expected in binary encoding
+# returns the encryption key and nonce in binary for webpush as a list (first element key, 2nd nonce)
+proc createEncryptionKeyNonce {clientPubKey serverPubKey ikm salt} {
+  set keyInfo [generateInfo aesgcm $clientPubKey $serverPubKey]
+  set key [ns_crypto::md hkdf -digest sha256 -salt $salt -secret $ikm -info $keyInfo -encoding binary 16]
 
+  set nonceInfo [generateInfo nonce $clientPubKey $serverPubKey]
+  set nonce [ns_crypto::md hkdf -digest sha256 -salt $salt -secret $ikm -info $nonceInfo -encoding binary 12]
+
+  return [list $key $nonce]
+}
+# encrypts the data using a private key from a pem file, the auth and p256dh fields of a subscription
+# and a 16 byte random salt value
+# aesgcm encoding for webpush is used
+# privKeyPem is the path to an EC private key pem file
+# other parameters are expected in binary format
+#
+# returns the encrypted message in binary format
+proc encrypt {data privKeyPem auth p256dh salt} {
+  set ServerPubKey [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
+  puts "serverpubkey [ns_base64encode $ServerPubKey]"
+  set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $p256dh]
+  puts "sharedSecret [ns_base64encode $sharedSecret]"
+  # make initial key material
+  set authInfo [binary format A*x "Content-Encoding: auth"]
+  puts "authinfo [ns_base64encode $authInfo]"
+  set ikm [ns_crypto::md hkdf -digest sha256 \
+             -salt   $auth \
+             -secret $sharedSecret \
+             -info   $authInfo \
+             -encoding binary \
+              32]
+  puts "ikm [ns_base64encode $ikm]"
+  # create encryption key and nonce
+  set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt]
+  set key [lindex $keyNonce 0]
+  puts "key [ns_base64encode $key]"
+  set nonce [lindex $keyNonce 1]
+  puts "nonce [ns_base64encode $nonce]"
+  # do encryption
+  set cipher [::ns_crypto::enc string -cipher aes-128-gcm -iv $nonce -key $key $data]
+  set result [dict get $cipher bytes][dict get $cipher tag]
+  return [binary format H* $result]
+}
 # serializes a dict to json
 # no testing for nested dicts or arrays, these will be simply added as a string
 # the json is in compact form,

@@ -39,12 +39,6 @@ namespace eval ::Test {
       append result [catch {validateClaim [subst {sub $validMail aud "abc"}] $validEndpoint}]
     } -result {11111}
 
-    test getPublickey {} -body {
-      set result [catch {getPublicKey $::vapidCertPath/public_key.txt}]
-      append result [catch {getPublicKey invalidpath}]
-      append result [getPublicKey $::vapidCertPath/prime256v1_key.pem]
-    } -result {11BFzhXP5G5Pp5xmEfESPsd7L6N2oQZZypGd2tUR5diW9spzJFs5DXaUuM1iMVfZGunUhtHkyYjqPfcQ2bfzKzbeY}
-
     test webpush-exceptions {} -body {
       set validMail {mailto:georg@test.com}
       # this is only a valid formatting, the endpoint does not exist
@@ -62,7 +56,7 @@ namespace eval ::Test {
       # auth and p256dh missing in subscription for data bearing Webpush
       append result [catch {webpush $validEndpoint "testdata" [subst {sub $validMail}] $validPem}]
     } -result {11111}
-
+    # positive tests fro parameter formating
     test webpush-cannotconnect {} -body {
       set validMail {mailto:georg@test.com}
       # this is only a valid formatting, the endpoint does not exist
@@ -106,21 +100,35 @@ namespace eval ::Test {
       }
     } -result {1}
 
-    test base64urlDerToPem {} -body {
-      set pemfile [base64urlDerToPem $::vapidCertPath/testbase64urldertopem.pem BFzhXP5G5Pp5xmEfESPsd7L6N2oQZZypGd2tUR5diW9spzJFs5DXaUuM1iMVfZGunUhtHkyYjqPfcQ2bfzKzbeY]
-      set f [open $pemfile]
-      set pem_content [read $f]
-      close $f
-      set pem_content
-    } -result {-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXOFc/kbk+nnGYR8RI+x3svo3ahBl
-nKkZ3a1RHl2Jb2ynMkWzkNdpS4zWIxV9ka6dSG0eTJiOo99xDZt/MrNt5g==
------END PUBLIC KEY-----}
-
+    # input/output for encryption functions from node.js crypto library
+    # see "test.js"
     test generateInfo {} -body {
       set result [string map {"\n" {}} [ns_base64encode \
-        [generateInfo aesgcm BJkXi48PlCiNCs9dLggxXQ39bdi64agt_emycss5gsg5BYqOWwP5gnbmga7Rg1_tKvnu0c3InK0C850s1czzyBg BJZRgas6kMag9rP2X5oVVhGzPwwT24p103WKkPlB7jFTmYVA3QsuLBaSSxNO-UVU-0SjHo0uIsiNoFQRYLDt7cE]]]
+        [generateInfo aesgcm [ns_base64urldecode BJkXi48PlCiNCs9dLggxXQ39bdi64agt_emycss5gsg5BYqOWwP5gnbmga7Rg1_tKvnu0c3InK0C850s1czzyBg] [ns_base64urldecode BJZRgas6kMag9rP2X5oVVhGzPwwT24p103WKkPlB7jFTmYVA3QsuLBaSSxNO-UVU-0SjHo0uIsiNoFQRYLDt7cE]]]]
     } -result {Q29udGVudC1FbmNvZGluZzogYWVzZ2NtAFAtMjU2AABBBJkXi48PlCiNCs9dLggxXQ39bdi64agt/emycss5gsg5BYqOWwP5gnbmga7Rg1/tKvnu0c3InK0C850s1czzyBgAQQSWUYGrOpDGoPaz9l+aFVYRsz8ME9uKddN1ipD5Qe4xU5mFQN0LLiwWkksTTvlFVPtEox6NLiLIjaBUEWCw7e3B}
+
+    test createEncryptionKeyNonce {} -body {
+      set clientPubKey [ns_base64decode BNvOAPaPCCfpNCMR4AccTffxD8YMQbfIBWieLxgZE1qgU+YVVT5mOD7CaRRqg5ykA7/f8jm2VuOPZLvHn0moHas=]
+      set serverPubKey [ns_base64decode BFzhXP5G5Pp5xmEfESPsd7L6N2oQZZypGd2tUR5diW9spzJFs5DXaUuM1iMVfZGunUhtHkyYjqPfcQ2bfzKzbeY=]
+      set ikm [ns_base64decode 4qL0g1tKiepxN01MPiRVjDAgC8PWwjlpFNccAS5rtvo=]
+      set salt [ns_base64decode WVGtEt/7tGKMNgqAeDvEPA==]
+      set keynonce [createEncryptionKeyNonce $clientPubKey \
+        $serverPubKey \
+        $ikm \
+        $salt]
+      set key [lindex $keynonce 0]
+      set nonce [lindex $keynonce 1]
+      set result [ns_base64encode $key]
+      concat $result [ns_base64encode $nonce]
+    } -result {bwUz6s4vfAi5a9xGFBVRXg== n14o2v4+edg7+ggO}
+
+    test encrypt {} -body {
+      ns_base64encode [encrypt "Push notification payload!" \
+        $::vapidCertPath/prime256v1_key.pem \
+        [ns_base64urldecode 4LLU4S9l1S9IrPTsQZkPqw] \
+        [ns_base64urldecode BNvOAPaPCCfpNCMR4AccTffxD8YMQbfIBWieLxgZE1qgU-YVVT5mOD7CaRRqg5ykA7_f8jm2VuOPZLvHn0moHas] \
+        [ns_base64decode WVGtEt/7tGKMNgqAeDvEPA==]]
+    } -result {w4gGftd6LQZeveV3ub/i3IfkUq9e3yShR1GGGDhOAo1OujxgrJaCQvr+}
 
     cleanupTests
 }
