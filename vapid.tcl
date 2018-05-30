@@ -270,28 +270,30 @@ proc createEncryptionKeyNonce {clientPubKey serverPubKey ikm salt} {
 #
 # returns the encrypted message in binary format
 proc encrypt {data privKeyPem auth p256dh salt} {
+  if {[string bytelength $data] > 4078} {
+    error "data is too large, maximum is 4078 bytes!"
+  }
   set ServerPubKey [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
-  # puts "serverpubkey [ns_base64encode $ServerPubKey]"
   set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $p256dh]
-  #puts "sharedSecret [ns_base64encode $sharedSecret]"
   # make initial key material
   set authInfo [binary format A*x "Content-Encoding: auth"]
-  #puts "authinfo [ns_base64encode $authInfo]"
   set ikm [ns_crypto::md hkdf -digest sha256 \
              -salt   $auth \
              -secret $sharedSecret \
              -info   $authInfo \
              -encoding binary \
               32]
-  #puts "ikm [ns_base64encode $ikm]"
   # create encryption key and nonce
   set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt]
   set key [lindex $keyNonce 0]
-  #puts "key [ns_base64encode $key]"
   set nonce [lindex $keyNonce 1]
-  #puts "nonce [ns_base64encode $nonce]"
+  # create padding that fills the message up completely to the maximum size
+  set paddingLength [expr {4078 - [string bytelength $data]}]
+  # the first two bytes of the padding indicate how many bytes of padding follow
+  # the padding itself consists of NULL bytes
+  set padding [binary format Sx$paddingLength $paddingLength]
   # do encryption
-  set cipher [::ns_crypto::enc string -cipher aes-128-gcm -iv $nonce -key $key $data]
+  set cipher [::ns_crypto::enc string -cipher aes-128-gcm -iv $nonce -key $key $padding$data]
   set result [dict get $cipher bytes][dict get $cipher tag]
   return [binary format H* $result]
 }
@@ -306,9 +308,6 @@ proc dictToJson {dict} {
   }
   return [string range $retJson 0 end-1]}
 }
-
-
-
 
 set claim [subst {
   {

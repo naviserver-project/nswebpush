@@ -109,10 +109,17 @@ function createInfo(type, clientPublicKey, serverPublicKey) {
 
   //encryption
   const plaintext = new Buffer('Push notification payload!', 'utf8');
+  //padding
+  const paddingLength = 4078 - plaintext.length;
+  console.log('paddinglength: ' + paddingLength);
+  var padding = new Buffer(2 + paddingLength);
+  // The buffer must be only zeros, except the length
+  padding.fill(0);
+  padding.writeUInt16BE(paddingLength, 0);
   const cipher = crypto.createCipheriv('id-aes128-GCM', contentEncryptionKey,
   nonce);
 
-  const result = cipher.update(plaintext);
+  const result = cipher.update(Buffer.concat([padding, plaintext]));
   console.log('Cypther result: ' + result.toString('base64'));
   cipher.final();
 
