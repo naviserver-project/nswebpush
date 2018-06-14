@@ -60,11 +60,13 @@ proc vapidToken {string} {
 # "exp" will be set to +24hours from the time of the function call if not provided
 #
 # private_key is the path to a pem file containing a VAPID EC private key
-#
+# encoding can be either 'aesgcm' or 'aes128gcm'
 # timeout is the timeout parameter of the push message (post request)
-#
 # ttl is the time to live of the push message
-proc webpush {subscription data claim private_key_pem {timeout 2.0} {ttl 0}} {
+proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout 2.0} {ttl 0}} {
+  if {$encoding ni {aesgcm aes128gcm}} {
+    error "Unknown encoding"
+  }
   # validate subscription
   if {[dict exists $subscription endpoint]} {
       set endpoint [dict get $subscription endpoint]
@@ -99,24 +101,21 @@ proc webpush {subscription data claim private_key_pem {timeout 2.0} {ttl 0}} {
     # It is not strictly required, but some push services may expect it.
     append cryptokey ";dh=$localPubKey;keyid=p256dh"
     ns_set update $headers Crypto-Key $cryptokey
-    # the Encryption header contains the salt which is a 16 byte (128bit) random value
+    # the Encryption header contains the salt which is a 16 byte random value
     # also used for encryption encoded in base64url format
-    set randomBits {}
-    for {set i 0} {$i < 128} {incr i} {
-      append randomBits [ns_rand 2]
-    }
-    set salt [binary format b128 $randomBits]
+    set salt [ns_crypto::randombytes -encoding binary 16]
     set encryption "keyid=p256dh;salt=[ns_base64urlencode $salt]"
     ns_set update $headers Encryption $encryption
     # set content-encoding and content-type headers
-    ns_set update $headers Content-Encoding aesgcm
+    ns_set update $headers Content-Encoding $encoding
     ns_set update $headers Content-Type application/octet-stream
     # encrypt the data
     set encrData [encrypt $data \
                           $localPrivateKeyPem \
                           [ns_base64urldecode [dict get $subscription auth]] \
                           [ns_base64urldecode [dict get $subscription p256dh]] \
-                          $salt]
+                          $salt \
+                          $encoding]
     # content-length header is the length of the encrypted data in bytes
     ns_set update $headers Content-Length [string length $encrData]
     # queue the request
@@ -232,7 +231,7 @@ proc makeJWT {claim private_key_pem} {
 }
 # generate the key/nonce info according to specification from the
 # clients public key and servers private key
-# type should be 'aesgcm' or 'nonce'
+# type should be 'aesgcm', 'aes128gcm' or 'nonce'
 # keys are expected in binary format
 #
 # returns info in binary format
@@ -251,40 +250,55 @@ proc generateInfo {type clientPubKey serverPubKey} {
   return $info
 }
 # derives key and nonce from client public key, server public key, initial key material and salt
-# input parameters are expected in binary encoding
+# input parameters (except encoding which can be 'aesgcm' or 'aes128gcm') are expected in binary encoding
 # returns the encryption key and nonce in binary for webpush as a list (first element key, 2nd nonce)
-proc createEncryptionKeyNonce {clientPubKey serverPubKey ikm salt} {
-  set keyInfo [generateInfo aesgcm $clientPubKey $serverPubKey]
-  set key [ns_crypto::md hkdf -digest sha256 -salt $salt -secret $ikm -info $keyInfo -encoding binary 16]
+proc createEncryptionKeyNonce {clientPubKey serverPubKey ikm salt encoding} {
+  if {$encoding eq "aes128gcm"} {
+    set keyInfo [binary format A*x "Content-Encoding: aes128gcm"]
+    set nonceInfo [binary format A*x "Content-Encoding: nonce"]
+  } else {
+    set keyInfo [generateInfo aesgcm $clientPubKey $serverPubKey]
+    set nonceInfo [generateInfo nonce $clientPubKey $serverPubKey]
+  }
 
-  set nonceInfo [generateInfo nonce $clientPubKey $serverPubKey]
+  set key [ns_crypto::md hkdf -digest sha256 -salt $salt -secret $ikm -info $keyInfo -encoding binary 16]
   set nonce [ns_crypto::md hkdf -digest sha256 -salt $salt -secret $ikm -info $nonceInfo -encoding binary 12]
 
   return [list $key $nonce]
 }
+# creates the initial key material for webpush the specified encoding
+proc makeIkm {auth p256dh ServerPubKey sharedSecret encoding} {
+  if {$encoding eq "aes128gcm"} {
+    set authInfo [binary format A*x "WebPush: info"]
+    append info $p256dh
+    append info $ServerPubKey
+  } else {
+    set authInfo [binary format A*x "Content-Encoding: auth"]
+  }
+  return [ns_crypto::md hkdf -digest sha256 \
+             -salt   $auth \
+             -secret $sharedSecret \
+             -info   $authInfo \
+             -encoding binary \
+              32]
+}
 # encrypts the data using a private key from a pem file, the auth and p256dh fields of a subscription
 # and a 16 byte random salt value
-# aesgcm encoding for webpush is used
 # privKeyPem is the path to an EC private key pem file
+# encoding can be 'aesgcm' or 'aes128gcm'
 # other parameters are expected in binary format
 #
 # returns the encrypted message in binary format
-proc encrypt {data privKeyPem auth p256dh salt} {
+proc encrypt {data privKeyPem auth p256dh salt encoding} {
   if {[string bytelength $data] > 4078} {
     error "data is too large, maximum is 4078 bytes!"
   }
   set ServerPubKey [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
   set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $p256dh]
   # make initial key material
-  set authInfo [binary format A*x "Content-Encoding: auth"]
-  set ikm [ns_crypto::md hkdf -digest sha256 \
-             -salt   $auth \
-             -secret $sharedSecret \
-             -info   $authInfo \
-             -encoding binary \
-              32]
+  set ikm [makeIkm $auth $p256dh $ServerPubKey $sharedSecret $encoding]
   # create encryption key and nonce
-  set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt]
+  set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt $encoding]
   set key [lindex $keyNonce 0]
   set nonce [lindex $keyNonce 1]
   # create padding that fills the message up completely to the maximum size
@@ -293,10 +307,42 @@ proc encrypt {data privKeyPem auth p256dh salt} {
   # the padding itself consists of NULL bytes
   set padding [binary format Sx$paddingLength $paddingLength]
   # do encryption
-  set cipher [::ns_crypto::enc string -cipher aes-128-gcm -iv $nonce -key $key $padding$data]
-  set result [dict get $cipher bytes][dict get $cipher tag]
-  return [binary format H* $result]
+  set cipher [::ns_crypto::aead::encrypt string -cipher aes-128-gcm -iv $nonce -key $key -encoding binary $padding$data]
+  return [dict get $cipher bytes][dict get $cipher tag]
 }
+# decrypts the encrypted data using a private key from a pem file, the server public key, the auth secret
+# and a 16 byte random salt value. Removes any padding after decryption.
+# The private key must be the key from the keypair that was used for encryption (p256dh field in
+# the subscription info is the public key)
+# encoding can be 'aesgcm' or 'aes128gcm'
+# other parameters (including data) are expected in binary format
+#
+# returns the encrypted message in binary format
+proc decrypt {encrData privKeyPem ServerPubKey auth salt encoding} {
+  set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $ServerPubKey]
+  # make initial key material
+  set localPub [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
+  set ikm [makeIkm $auth $localPub $ServerPubKey $sharedSecret $encoding]
+  # create encryption key and nonce
+  set keyNonce [createEncryptionKeyNonce $localPub $ServerPubKey $ikm $salt $encoding]
+  set key [lindex $keyNonce 0]
+  set nonce [lindex $keyNonce 1]
+  # the tag are the last 16 bytes of the data according to aesgcm specification
+  set tag [string range $encrData end-15 end]
+  set data [string range $encrData 0 end-16]
+  set decrypted [ns_crypto::aead::decrypt string -cipher aes-128-gcm -iv $nonce -key $key -tag $tag -encoding binary $data]
+  # padding consists of leading null bytes followed by two bytes that indicate the size of the padding
+  # remove the 2 bytes of padding length
+  set decrypted [string range $decrypted 2 end]
+  # remove null bytes
+  while {[string index $decrypted 0] eq [binary format x]} {
+    # remove first byte
+    set decrypted [string range $decrypted 1 end]
+  }
+  return $decrypted
+}
+
+
 # serializes a dict to json
 # no testing for nested dicts or arrays, these will be simply added as a string
 # the json is in compact form,

@@ -107,6 +107,7 @@ function createInfo(type, clientPublicKey, serverPublicKey) {
   console.log('expected: 3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf');
   console.log(hkdf(s, se, inf, 32).toString('hex'));
 
+
   //encryption
   const plaintext = new Buffer('Push notification payload!', 'utf8');
   //padding
