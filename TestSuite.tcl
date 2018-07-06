@@ -33,7 +33,7 @@ namespace eval ::Test {
       set exp [dict get $claim exp]
       append result [expr [clock seconds] < $exp && $exp < [expr [clock seconds] + 60*61*24]]
       set aud [dict get $claim aud]
-      if {$aud eq "https://updates.push.services.mozilla.com/"} {
+      if {$aud eq "https://updates.push.services.mozilla.com"} {
         append result 1
       }
       # endpoint and 'aud' missmatch
@@ -78,19 +78,20 @@ namespace eval ::Test {
 
     test webpush-success {} -body {
       set epDict [::json::json2dict {
-        {"endpoint":"https://updates.push.services.mozilla.com/wpush/v2/gAAAAABbDva6eH834SujdvM_jCvKNhk3j5qycsmjqy--oatro7xbySC-zS83JoKdIPLoxgwZAb3mS3gamJGqQVyOH6XEDujnT8dPqBoohOwLycnQ5JvYB2TGBAoipOz8ftH0w1g5-7nti6jstuEBnMcnjraC3PcnXo-GYwyRnp3Tf-0DHdccZQI","keys":{"auth":"nkWlfrXfEbDqEeLVVwo4rw","p256dh":"BMovGyGsKqOeLFsThvtoDm3NgtKSVyVqyeoIoASqhlkd46Ei6BSJa3codWCjpdG46UiYvKPAXAi8c2Y2WKT81yU"}}
+        {"endpoint":"https://fcm.googleapis.com/fcm/send/d9IxzALjkyU:APA91bFkfLpZ4H8TEaCel9OtfL0V1LCSOGg253Cb0829sSwfo2CcKt_neqG5mZy8fhhRoeYyj-3Ds8i3edWn06snJxOULw68QV0RQe6yOgJ7vF70LWvzVi2QP1ZxtBLwLLkbbfI62Yuj","expirationTime":null,"keys":{"p256dh":"BG8SsZZCcU-hqyygt5d3Ov39GEyFM6wixAJqz37KBdEibeSKwJZz_T3li6B1aktuYDMOA0fEqIhzzMLqGfQ3gNU","auth":"8O1T8AvRJcqA8UB3vMVCoA"}}
         }]
       set keys [dict get $epDict keys]
       set validEndpoint [subst {endpoint [dict get $epDict endpoint] auth [dict get $keys auth] p256dh [dict get $keys p256dh]}]
       set validClaim {sub mailto:georg@test.com}
       set validPem $::vapidCertPath/prime256v1_key.pem
-      if {[webpush $validEndpoint "" $validClaim $validPem aesgcm 60] < 300} {
-        set result 1
-      }
-      if {[webpush $validEndpoint "encrypted data received!" $validClaim $validPem aesgcm 60] < 300} {
-        append result 1
-      }
-      if {[webpush $validEndpoint "encrypted data received!" $validClaim $validPem aes128gcm 60] < 300} {
+      set result ""
+      #if {[webpush $validEndpoint "" $validClaim $validPem aesgcm 60] < 300} {
+      #  set result 1
+      #}
+      #if {[webpush $validEndpoint "encrypted data received!" $validClaim $validPem aesgcm 60] < 300} {
+      #  append result 1
+      #}
+      if {[webpush $validEndpoint "aes128gcm data received!" $validClaim $validPem aes128gcm 60] < 300} {
         append result 1
       }
     } -result {111}

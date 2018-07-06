@@ -79,15 +79,17 @@ proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout
   set claim [validateClaim $claim $endpoint]
   # create a signed jwt token
   set jwt [makeJWT $claim $private_key_pem]
+  puts "THIS IS JWT: $jwt"
   # create vapid Authorization header
   set authorization "WebPush $jwt"
   # the crypto key header contains the server public key
-  set cryptokey p256ecdsa=$server_public_key
+  set cryptokey "p256ecdsa=$server_public_key"
   # start creating headers
+  ns_logctl severity Debug(task) on
   set headers [ns_set create]
-  ns_set update $headers Authorization $authorization
-  ns_set update $headers Crypto-Key $cryptokey
-  ns_set update $headers TTL $ttl
+  ns_set update $headers "authorization" $authorization
+  ns_set update $headers "crypto-key" $cryptokey
+  ns_set update $headers "ttl" $ttl
   # data bearing push messages need "auth" and "p256dh" fields for encryption
   if {$data ne {}} {
     if {![dict exists $subscription auth] || ![dict exists $subscription p256dh]} {
@@ -96,19 +98,22 @@ proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout
     # for each data bearing push messages a new local private key needs to be created
     set localPrivateKeyPem [createPrivateKeyPem $::vapidCertPath/temp_encryption_priv.pem]
     set localPubKey [ns_crypto::eckey pub -pem $localPrivateKeyPem -encoding base64url]
-    # public key used for encryption needs to be appended to the crypt-key header.
-    # The keyid field links the Crypto-Key header with the Encryption header.
-    # It is not strictly required, but some push services may expect it.
-    append cryptokey ";dh=$localPubKey;keyid=p256dh"
-    ns_set update $headers Crypto-Key $cryptokey
-    # the Encryption header contains the salt which is a 16 byte random value
-    # also used for encryption encoded in base64url format
+    # salt is needed for encryption
     set salt [ns_crypto::randombytes -encoding binary 16]
-    set encryption "keyid=p256dh;salt=[ns_base64urlencode $salt]"
-    ns_set update $headers Encryption $encryption
+    if {$encoding eq "aesgcm"} {
+      # public key used for encryption needs to be appended to the crypt-key header.
+      # The keyid field links the Crypto-Key header with the Encryption header.
+      # It is not strictly required, but some push services may expect it.
+      append cryptokey ";dh=$localPubKey;keyid=p256dh"
+      ns_set update $headers "crypto-key" $cryptokey
+      # the Encryption header contains the salt
+      # also used for encryption encoded in base64url format
+      set encryption "keyid=p256dh;salt=[ns_base64urlencode $salt]"
+      ns_set update $headers "encryption" $encryption
+    }
     # set content-encoding and content-type headers
-    ns_set update $headers Content-Encoding $encoding
-    ns_set update $headers Content-Type application/octet-stream
+    ns_set update $headers "content-encoding" $encoding
+    ns_set update $headers "content-type" application/octet-stream
     # encrypt the data
     set encrData [encrypt $data \
                           $localPrivateKeyPem \
@@ -117,7 +122,7 @@ proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout
                           $salt \
                           $encoding]
     # content-length header is the length of the encrypted data in bytes
-    ns_set update $headers Content-Length [string length $encrData]
+    ns_set update $headers "content-length" [string length $encrData]
     # queue the request
     set req [ns_http queue -method POST \
        -headers $headers \
@@ -125,10 +130,12 @@ proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout
        -body $encrData \
        $endpoint]
   } else {
+    ns_set update $headers "content-type" "application/octet-stream"
     # push messages without a payload do not have a request body
     set req [ns_http queue -method POST \
        -headers $headers \
        -timeout $timeout \
+       -body "" \
        $endpoint]
   }
   set replyHeaders [ns_set create]
@@ -196,9 +203,13 @@ proc validateClaim {claim endpoint} {
     }
   } else {
     if {$endPointArr(port) eq ""} {
-      dict set claim aud [::uri::join scheme $endPointArr(scheme) host $endPointArr(host)]
+      set aud [::uri::join scheme $endPointArr(scheme) host $endPointArr(host)]
+      # remove / at the end of url
+      dict set claim aud [string range $aud 0 end-1]
     } else {
-      dict set claim aud [::uri::join scheme $endPointArr(scheme) host $endPointArr(host) port $endPointArr(port)]
+      set aud [::uri::join scheme $endPointArr(scheme) host $endPointArr(host) port $endPointArr(port)]
+      # remove / at the end of url
+      dict set claim aud [string range $aud 0 end-1]
     }
   }
   # validate/add exp
@@ -282,6 +293,39 @@ proc makeIkm {auth p256dh ServerPubKey sharedSecret encoding} {
              -encoding binary \
               32]
 }
+# fills the data with maximum padding according to the encoding
+# returns the padded data
+proc padData {encoding data} {
+  if {$encoding eq "aesgcm"} {
+    # maximum size for aesgcm is 4078
+    set paddingLength [expr {4078 - [string bytelength $data]}]
+    # the first two bytes of the padding indicate how many bytes of padding follow
+    # the padding itself consists of NULL bytes
+    set padding [binary format Sx$paddingLength $paddingLength]
+    return $padding$data
+  } elseif {$encoding eq "aes128gcm"} {
+    # set maximum padding length:
+    # maximum lengt(4096 - 86 for header) - 16 for the cipher tag - 1 for the delimiter byte
+    set paddingLength [expr {4010 -16 - 1 - [string bytelength $data]}]
+    set padding \x02
+    append padding [binary format x$paddingLength]
+    return $data$padding
+  } else {
+    error "Unknown encoding $encoding. Only aesgcm and aes128gcm supported"
+  }
+}
+
+# creates the encryption content encoding header according to
+# aes128gcm draft.
+# parameters are expected in binary format
+proc createAes128gcmHeader {salt publicKey} {
+  set result $salt
+  # set record size to maximum for now
+  append result [binary format I 4096]
+  append result [binary format c [string length $publicKey]]
+  append result $publicKey
+  return $result
+}
 # encrypts the data using a private key from a pem file, the auth and p256dh fields of a subscription
 # and a 16 byte random salt value
 # privKeyPem is the path to an EC private key pem file
@@ -301,14 +345,16 @@ proc encrypt {data privKeyPem auth p256dh salt encoding} {
   set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt $encoding]
   set key [lindex $keyNonce 0]
   set nonce [lindex $keyNonce 1]
-  # create padding that fills the message up completely to the maximum size
-  set paddingLength [expr {4078 - [string bytelength $data]}]
-  # the first two bytes of the padding indicate how many bytes of padding follow
-  # the padding itself consists of NULL bytes
-  set padding [binary format Sx$paddingLength $paddingLength]
   # do encryption
-  set cipher [::ns_crypto::aead::encrypt string -cipher aes-128-gcm -iv $nonce -key $key -encoding binary $padding$data]
-  return [dict get $cipher bytes][dict get $cipher tag]
+  set paddedData [padData $encoding $data]
+  set cipher [::ns_crypto::aead::encrypt string -cipher aes-128-gcm -iv $nonce -key $key -encoding binary $paddedData]
+  # aes128gcm requires the header to be sent in the payload
+  set result {}
+  if {$encoding eq "aes128gcm"} {
+    set result [createAes128gcmHeader $salt $ServerPubKey]
+  }
+  append result [dict get $cipher bytes][dict get $cipher tag]
+  return $result
 }
 # decrypts the encrypted data using a private key from a pem file, the server public key, the auth secret
 # and a 16 byte random salt value. Removes any padding after decryption.
