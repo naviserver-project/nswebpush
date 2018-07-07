@@ -85,12 +85,12 @@ namespace eval ::Test {
       set validClaim {sub mailto:georg@test.com}
       set validPem $::vapidCertPath/prime256v1_key.pem
       set result ""
-      #if {[webpush $validEndpoint "" $validClaim $validPem aesgcm 60] < 300} {
-      #  set result 1
-      #}
-      #if {[webpush $validEndpoint "encrypted data received!" $validClaim $validPem aesgcm 60] < 300} {
-      #  append result 1
-      #}
+      if {[webpush $validEndpoint "" $validClaim $validPem aesgcm 60] < 300} {
+        set result 1
+      }
+      if {[webpush $validEndpoint "encrypted data received!" $validClaim $validPem aesgcm 60] < 300} {
+        append result 1
+      }
       if {[webpush $validEndpoint "aes128gcm data received!" $validClaim $validPem aes128gcm 60] < 300} {
         append result 1
       }
@@ -133,6 +133,13 @@ namespace eval ::Test {
       set result [ns_base64encode $key]
       concat $result [ns_base64encode $nonce]
     } -result {bwUz6s4vfAi5a9xGFBVRXg== n14o2v4+edg7+ggO}
+
+
+    test createAes128gcmHeader {} -body {
+      ns_base64urlencode [createAes128gcmHeader \
+        [ns_base64urldecode I1BsxtFttlv3u_Oo94xnmw] \
+        ""]
+    } -result {I1BsxtFttlv3u_Oo94xnmwAAEAAA}
 
     test encrypt {} -body {
       set result [string map {"\n" {}} [ns_base64encode [encrypt "Push notification payload!" \

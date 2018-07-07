@@ -281,8 +281,8 @@ proc createEncryptionKeyNonce {clientPubKey serverPubKey ikm salt encoding} {
 proc makeIkm {auth p256dh ServerPubKey sharedSecret encoding} {
   if {$encoding eq "aes128gcm"} {
     set authInfo [binary format A*x "WebPush: info"]
-    append info $p256dh
-    append info $ServerPubKey
+    append authInfo $p256dh
+    append authInfo $ServerPubKey
   } else {
     set authInfo [binary format A*x "Content-Encoding: auth"]
   }
@@ -306,7 +306,7 @@ proc padData {encoding data} {
   } elseif {$encoding eq "aes128gcm"} {
     # set maximum padding length:
     # maximum lengt(4096 - 86 for header) - 16 for the cipher tag - 1 for the delimiter byte
-    set paddingLength [expr {4010 -16 - 1 - [string bytelength $data]}]
+    set paddingLength [expr {4010 - 16 - 1 - [string bytelength $data]}]
     set padding \x02
     append padding [binary format x$paddingLength]
     return $data$padding
