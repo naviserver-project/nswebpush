@@ -1,60 +1,11 @@
 package require uri
-
-#
-# Test file for VAPID token generation
-# RFC 8292: Voluntary Application Server Identification (VAPID)
-#
-
-set ::vapidCertPath "[ns_info home]/modules/vapid"
-set ::testSuite "[ns_info home]/pages/pushnotificationsapi/TestSuite.tcl"
-
-if {![file exists $::vapidCertPath/prime256v1_key.pem]} {
-    #
-    # create private key for vapid
-    #
-    if {[catch {
-	file mkdir $::vapidCertPath
-    }]} {
-	ns_log notice "insufficient permissions for NaviServer to crate directory $::vapidCertPath"
-	ns_log notice "probably the following command will help:\nsudo chown nsadmin [ns_info home]/modules/"
-    } else {
-	cd $::vapidCertPath
-	ns_log notice ".... creating private_key.pem"
-	exec -ignorestderr openssl ecparam -genkey -name prime256v1 -out prime256v1_key.pem
-    }
-}
-if {![file exists $::vapidCertPath/public_key.txt]} {
-    cd $::vapidCertPath
-    ns_log notice ".... extracting .txt files"
-    exec -ignorestderr openssl ec -in prime256v1_key.pem -pubout -outform DER | tail -c 65 | base64 | tr -d '=' | tr '/+' '-_' > public_key.txt
-    exec -ignorestderr openssl ec -in prime256v1_key.pem -outform DER | tail -c +8 | head -c 32 | base64 | tr -d '=' | tr '/+' '-_' > private_key.txt
-}
-
-proc stripWhitespacesNewlines {str} {
-  return [string map {" " {} \n {}} $str]
-}
-
-proc vapidToken {string} {
-    set signature [::ns_crypto::md vapidsign -digest sha256 -encoding base64url -pem $::vapidCertPath/prime256v1_key.pem $string]
-    return $string.$signature
-}
-
 #
 #  webpush
 #
 #  send a push notification to the specified substription endpoint
 #
-#  subscribtion is expected to be a dict that includes at least an "endpoint"
-#  for data bearing subscriptions the key field needs to be set aswell
-#  this is an example of a json formatted subscribtion:
-# {
-#   "endpoint":"https://updates.push.services.mozilla.com/wpush/v2/gAAAA...",
-#   "keys":{
-#     "auth":"5DqpICDCHSi..",
-#     "p256dh":"BFECk9GdfDOJOzx.."
-#   }
-# }
-#
+# subscribtion is expected to be a dict that includes at least an "endpoint"
+# for data bearing subscriptions an "auth" and a "p256dh" fields are expected (these fields should expect the base64url encoded values)
 # claim is a dict containing at least a "sub" field that contains a "mailto:example@example.org" email adress
 # the "aud" of the claim will be extracted from the endpoint if not provided
 # "exp" will be set to +24hours from the time of the function call if not provided
@@ -79,16 +30,11 @@ proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout
   set claim [validateClaim $claim $endpoint]
   # create a signed jwt token
   set jwt [makeJWT $claim $private_key_pem]
-  puts "THIS IS JWT: $jwt"
   # create vapid Authorization header
-  set authorization "WebPush $jwt"
-  # the crypto key header contains the server public key
-  set cryptokey "p256ecdsa=$server_public_key"
+  set authorization "vapid t=$jwt,k=$server_public_key"
   # start creating headers
-  ns_logctl severity Debug(task) on
   set headers [ns_set create]
   ns_set update $headers "authorization" $authorization
-  ns_set update $headers "crypto-key" $cryptokey
   ns_set update $headers "ttl" $ttl
   # data bearing push messages need "auth" and "p256dh" fields for encryption
   if {$data ne {}} {
@@ -104,7 +50,7 @@ proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout
       # public key used for encryption needs to be appended to the crypt-key header.
       # The keyid field links the Crypto-Key header with the Encryption header.
       # It is not strictly required, but some push services may expect it.
-      append cryptokey ";dh=$localPubKey;keyid=p256dh"
+      set cryptokey "dh=$localPubKey;keyid=p256dh"
       ns_set update $headers "crypto-key" $cryptokey
       # the Encryption header contains the salt
       # also used for encryption encoded in base64url format
@@ -141,8 +87,6 @@ proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout
   set replyHeaders [ns_set create]
   # wait for answer of push service and record reply
   ns_http wait -result result -headers $replyHeaders -status status $req
-  puts $result
-  puts $status
   if {$status > 202} {
     error "Webpush failed!" $result $status
   }
@@ -156,22 +100,6 @@ proc createPrivateKeyPem {path} {
     file delete -force $path
   }
   ns_crypto::eckey generate -name prime256v1 -pem $path
-  return $path
-}
-
-# creates a public key pem file at the location specified in path
-# derived from the private key pem file specified in privkey
-# overwrites the file if it exists
-# returns the path if successfull
-proc createPublicKeyPem {path privkey} {
-  if {[file exists $path]} {
-    file delete -force $path
-  }
-  if {[catch {
-    exec -ignorestderr openssl ec -in $privkey -pubout -out $path
-  }]} {
-    error "Could not generate public key"
-  }
   return $path
 }
 #
@@ -356,15 +284,62 @@ proc encrypt {data privKeyPem auth p256dh salt encoding} {
   append result [dict get $cipher bytes][dict get $cipher tag]
   return $result
 }
+# extracts the key material and salt according to aes128gcm
+# returns a list containing the key then the salt then the total length of the header
+proc extractHeader {bytes} {
+  # salt are the first 16 bytes
+  set salt [string range $bytes 0 15]
+  # the length of the key material is set in byte 21
+  binary scan [string index $bytes 20] c len
+  set key [string range $bytes 21 [expr 20 + $len]]
+  set headerlen [expr 16 + 4 + 1 + $len]
+  return [list $key $salt $headerlen]
+}
+# unpads data according to the encoding
+proc unpad {data encoding} {
+  if {$encoding eq "aesgcm"} {
+    # padding consists of leading null bytes followed by two bytes that indicate the size of the padding
+    # remove the 2 bytes of padding length
+    set data [string range $data 2 end]
+    # remove null bytes
+    while {[string index $data 0] eq "\x00"} {
+      # remove first byte
+      set data [string range $data 1 end]
+    }
+    return $data
+  } elseif {$encoding eq "aes128gcm"} {
+    # null bytes at the end are padding
+    while {[string index $data end] eq "\x00"} {
+      #remove last byte
+      set data [string range $data 0 end-1]
+    }
+    # one delimiter bytes separates the data and the padding
+    # remove this byte
+    return [string range $data 0 end-1]
+  }
+}
 # decrypts the encrypted data using a private key from a pem file, the server public key, the auth secret
 # and a 16 byte random salt value. Removes any padding after decryption.
 # The private key must be the key from the keypair that was used for encryption (p256dh field in
-# the subscription info is the public key)
+# the subscription info is the public key). The public key of server and salt can be derived from the
+# ciphertext (encrData) in aes128gcm.
 # encoding can be 'aesgcm' or 'aes128gcm'
 # other parameters (including data) are expected in binary format
 #
 # returns the encrypted message in binary format
-proc decrypt {encrData privKeyPem ServerPubKey auth salt encoding} {
+proc decrypt {encrData privKeyPem auth encoding {ServerPubKey ""} {salt ""}} {
+  if {$ServerPubKey eq "" || $salt eq ""} {
+    if {$encoding ne "aes128gcm"} {
+      error "Server public key and salt required for $encoding encoding!"
+    }
+    # get key and salt from header
+    set keySalt [extractHeader $encrData]
+    set ServerPubKey [lindex $keySalt 0]
+    set salt [lindex $keySalt 1]
+    # remove header
+    set headerlen [lindex $keySalt 2]
+    set encrData [string range $encrData $headerlen end]
+  }
   set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $ServerPubKey]
   # make initial key material
   set localPub [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
@@ -373,22 +348,14 @@ proc decrypt {encrData privKeyPem ServerPubKey auth salt encoding} {
   set keyNonce [createEncryptionKeyNonce $localPub $ServerPubKey $ikm $salt $encoding]
   set key [lindex $keyNonce 0]
   set nonce [lindex $keyNonce 1]
-  # the tag are the last 16 bytes of the data according to aesgcm specification
+  # the tag are the last 16 bytes of the data
   set tag [string range $encrData end-15 end]
   set data [string range $encrData 0 end-16]
+
   set decrypted [ns_crypto::aead::decrypt string -cipher aes-128-gcm -iv $nonce -key $key -tag $tag -encoding binary $data]
-  # padding consists of leading null bytes followed by two bytes that indicate the size of the padding
-  # remove the 2 bytes of padding length
-  set decrypted [string range $decrypted 2 end]
-  # remove null bytes
-  while {[string index $decrypted 0] eq [binary format x]} {
-    # remove first byte
-    set decrypted [string range $decrypted 1 end]
-  }
-  return $decrypted
+
+  return [unpad $decrypted $encoding]
 }
-
-
 # serializes a dict to json
 # no testing for nested dicts or arrays, these will be simply added as a string
 # the json is in compact form,
@@ -400,53 +367,3 @@ proc dictToJson {dict} {
   }
   return [string range $retJson 0 end-1]}
 }
-
-set claim [subst {
-  {
-  "sub" : "mailto:h0325904@wu.ac.at",
-  "aud" : "https://updates.push.services.mozilla.com/",
-  "exp" : "[expr [clock seconds] + 60*120]"
-  }
-}]
-
-# the JWT base string is the header and body separated with a "."
-set JWTHeader [ns_base64urlencode {{"typ":"JWT","alg":"ES256"}}]
-set JWTbody [ns_base64urlencode [stripWhitespacesNewlines $claim]]
-
-set token [vapidToken $JWTHeader.$JWTbody]
-ns_log notice "VAPID token: <$token>"
-
-set f [open $::vapidCertPath/public_key.txt]
-set pub_key [read $f]
-close $f
-
-set f [open $::vapidCertPath/private_key.txt]
-set priv_key [read $f]
-close $f
-
-set f [open $::vapidCertPath/prime256v1_key.pem]
-set pem [read $f]
-close $f
-
-source $::testSuite
-
-ns_return 200 text/plain [subst {
-    claim:
-    $claim
-
-    unsigned: $JWTHeader.$JWTbody
-
-    VAPID token: $token
-    VAPID token length: [string length $token]
-
-    $::vapidCertPath/prime256v1_key.pem - [file size $::vapidCertPath/prime256v1_key.pem] bytes
-    $::vapidCertPath/public_key.txt     - [file size $::vapidCertPath/public_key.txt] bytes
-    $::vapidCertPath/private_key.txt    - [file size $::vapidCertPath/private_key.txt] bytes
-
-    public_key : [string trim $pub_key]
-    private_key: [string trim $priv_key]
-
-    prime256v1_key.pem\n$pem
-
-    HOME: $::env(HOME)
-}]
