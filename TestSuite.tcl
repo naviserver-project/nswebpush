@@ -53,15 +53,15 @@ namespace eval ::Test {
       # all wrong
       set result [catch {webpush a "" "" ""}]
       # missing private key
-      append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] ""}]
+      append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] "" $::vapidCertPath}]
       # private key not a pem file
-      append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] $::vapidCertPath/public_key.txt}]
+      append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] $::vapidCertPath/public_key.txt $::vapidCertPath}]
       # invalid email adress
-      append result [catch {webpush $validEndpoint "" {sub maito:testtest} $validPem}]
+      append result [catch {webpush $validEndpoint "" {sub maito:testtest} $validPem $::vapidCertPath}]
       # auth and p256dh missing in subscription for data bearing Webpush
-      append result [catch {webpush $validEndpoint "testdata" [subst {sub $validMail}] $validPem}]
+      append result [catch {webpush $validEndpoint "testdata" [subst {sub $validMail}] $validPem $::vapidCertPath}]
       # invalid Encoding
-      append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] $validPem abcencoding}]
+      append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] $validPem $::vapidCertPath abcencoding}]
     } -result {111111}
     # positive tests fro parameter formating
     test webpush-cannotconnect {} -body {
@@ -70,13 +70,13 @@ namespace eval ::Test {
       set validEndpoint {endpoint https://updates.push.services.mozilla.com/wpush/v2/gAAAAABa6CXAoHisP}
       set validPem $::vapidCertPath/prime256v1_key.pem
       # all good (no data is ok) - expected result is error 404 cannot connect
-      catch {webpush $validEndpoint "" [subst {sub $validMail}] $validPem} msg opt
+      catch {webpush $validEndpoint "" [subst {sub $validMail}] $validPem $::vapidCertPath} msg opt
       set result [dict get $opt -errorcode]
       # all good (valid aud)
-      catch {webpush $validEndpoint "" [subst {sub $validMail aud "https://updates.push.services.mozilla.com/"}] $validPem} msg opt
+      catch {webpush $validEndpoint "" [subst {sub $validMail aud "https://updates.push.services.mozilla.com/"}] $validPem $::vapidCertPath} msg opt
       append result [dict get $opt -errorcode]
       # all good (valid exp)
-      catch {webpush $validEndpoint "" [subst {sub $validMail exp [expr [clock seconds] + 60*120]}] $validPem} msg opt
+      catch {webpush $validEndpoint "" [subst {sub $validMail exp [expr [clock seconds] + 60*120]}] $validPem $::vapidCertPath} msg opt
       append result [dict get $opt -errorcode]
     } -result {404404404}
 
@@ -89,13 +89,13 @@ namespace eval ::Test {
       set validClaim {sub mailto:georg@test.com}
       set validPem $::vapidCertPath/prime256v1_key.pem
       set result ""
-      if {[webpush $validEndpoint "" $validClaim $validPem aesgcm 60] < 300} {
+      if {[webpush $validEndpoint "" $validClaim $validPem $::vapidCertPath aesgcm 60] < 300} {
         set result 1
       }
-      if {[webpush $validEndpoint "encrypted data received!" $validClaim $validPem aesgcm 60] < 300} {
+      if {[webpush $validEndpoint "encrypted data received!" $validClaim $validPem $::vapidCertPath aesgcm 60] < 300} {
         append result 1
       }
-      if {[webpush $validEndpoint "aes128gcm data received!" $validClaim $validPem aes128gcm 60] < 300} {
+      if {[webpush $validEndpoint "aes128gcm data received!" $validClaim $validPem $::vapidCertPath aes128gcm 60] < 300} {
         append result 1
       }
     } -result {111}

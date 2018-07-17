@@ -198,7 +198,7 @@
     <h2>Tcl API for Webpush and Naviserver</h2>
     <p>We created a simple to use <a href=https://bitbucket.org/Gepro83/pushnotificationsapi/src/master/vapid.tcl> tcl API</a> that builds on naviserver which handles all of the VAPID and encryption details for you. As a user of this API all you need to do is call a single function to send a push notification to a client:</p>
     <p><code>
-    proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout 2.0} {ttl 0}} {<br>
+    proc webpush {subscription data claim private_key_pem localKeyPath {encoding aesgcm} {timeout 2.0} {ttl 0}} {<br>
     …<br>
     } <br>
     </code></p>
@@ -206,6 +206,7 @@
     <code>data</code> contains the data you want to send as a payload. Make sure not to exceed that maximum payload size, otherwise an exception will be thrown.<br>
     <code>claim</code> is a dict containing at least a “sub” field. If “aud” and “exp” fields exist they will be validated, otherwise the will be extracted from the endpoint respectively set to a default.<br>
     <code>private_key_pem</code> is the path to a pem file containing the private key you want to use for VAPID.<br>
+    <code>localKeyPath</code> is a path to a directory with write access to create temporary keys for encryption.<br>
     <code>encoding</code> can be set to “aesgcm” which is the default or “aes128gcm”.<br>
     <code>timeout</code> Is the timeout value for the post request in seconds.<br>
     <code>ttl</code> is the time to live in seconds for the push message.<br>

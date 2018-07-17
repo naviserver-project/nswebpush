@@ -11,10 +11,11 @@ package require uri
 # "exp" will be set to +24hours from the time of the function call if not provided
 #
 # private_key is the path to a pem file containing a VAPID EC private key
+# localKeyPath is a path to a directory with write access to create temporary keys for encryption
 # encoding can be either 'aesgcm' or 'aes128gcm'
 # timeout is the timeout parameter of the push message (post request)
 # ttl is the time to live of the push message
-proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout 2.0} {ttl 0}} {
+proc webpush {subscription data claim private_key_pem localKeyPath {encoding aesgcm} {timeout 2.0} {ttl 0}} {
   if {$encoding ni {aesgcm aes128gcm}} {
     error "Unknown encoding"
   }
@@ -42,7 +43,7 @@ proc webpush {subscription data claim private_key_pem {encoding aesgcm} {timeout
       error "Data bearing push messages need auth and p256dh fields in subscription"
     }
     # for each data bearing push messages a new local private key needs to be created
-    set localPrivateKeyPem [createPrivateKeyPem $::vapidCertPath/temp_encryption_priv.pem]
+    set localPrivateKeyPem [createPrivateKeyPem $localKeyPath/temp_encryption_priv.pem]
     set localPubKey [ns_crypto::eckey pub -pem $localPrivateKeyPem -encoding base64url]
     # salt is needed for encryption
     set salt [ns_crypto::randombytes -encoding binary 16]
