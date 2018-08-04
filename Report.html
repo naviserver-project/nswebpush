@@ -10,19 +10,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
 
-    <title>Realising Webpush with Naviserver</title>
+    <title>Realising Webpush with NaviServer</title>
   </head>
   <body>
   <div class="container">
       <div class="jumbotron">
-      <h1 class="display-4">Realising Webpush with Naviserver</h1>
-      <p class="lead">This article gives an overview over the webpush protocol, VAPID and payload encryption. Additionally, we present a Tcl API that uses Naviserver's cryptographic functionality to implement webpush.</p>
+      <h1 class="display-4">Realising Webpush with NaviServer</h1>
+      <p class="lead">This article gives an overview over the webpush protocol, VAPID and payload encryption. Additionally, we present a Tcl API that uses NaviServer's cryptographic functionality to implement webpush.</p>
       </div>
   </div>
   <div class="container" style="max-width: 50%;">
     <h2>Introduction</h2>
     <p>Webpush notifications are a relatively recent technology. It allows one to send messages to the user out of context of your web application, i.e. even when the respective browsertab is closed. This can be very useful for time-sensitive information or for alerting the user of some event. At the time of writing (2018) this feature is supported by Google Chrome and Mozilla Firefox. For mobile devices, currently, only the Android operation system supports it.</p>
-    <p><a href=https://github.com/web-push-libs>Libraries</a> in various languages exist that hide the implementation details of webpush, however, as far as we know, no open source Tcl implementation exists so far. In this article we describe how we filled that gap using <a href=https://naviserver.sourceforge.io>naviserver</a> and created a simple API open for anyone to use.
+    <p><a href=https://github.com/web-push-libs>Libraries</a> in various languages exist that hide the implementation details of webpush, however, as far as we know, no open source Tcl implementation exists so far. In this article we describe how we filled that gap using <a href=https://NaviServer.sourceforge.io>NaviServer</a> and created a simple API open for anyone to use.
     </p>
     <p>The <a href=https://tools.ietf.org/html/draft-ietf-webpush-protocol-12>Web Push Protocol</a> is a standard that specifies how the delivery of such messages works. Both Chrome and Firefox implement this protocol, so your application does not have to distinguish which browser your user is working with. Before we get into details how it works we are going to define some terms.</p>
     <h3>Webpush Terminology</h3>
@@ -51,9 +51,9 @@
     For a push service to forward your message to the client it needs to be certain that it actually came from you. This is ensured through a <a href=https://jwt.io/>JSON Web Token</a> (jwt) that must be included in the header of every push message. This jwt must be created according to the <a href=https://tools.ietf.org/id/draft-ietf-webpush-vapid-03.html>VAPID specification</a>.
     </p>
     <h4>Generating VAPID keys</h4>
-    <p>The first thing you will need is a private key that is used for identification. The webpush and VAPID encryption mechanism uses the elliptic-curve Diffie-Hellman (ecdh) protocol for key agreement. We will not go into detail here how it works, just note that this algorithm uses geometric curves to derive keys.<br>Many different curves exist; for webpush we need a curve called Prime 256v1 (or sometimes “P-256”). To create a new private key in Tcl we can use naviserver like so:</p>
+    <p>The first thing you will need is a private key that is used for identification. The webpush and VAPID encryption mechanism uses the elliptic-curve Diffie-Hellman (ecdh) protocol for key agreement. We will not go into detail here how it works, just note that this algorithm uses geometric curves to derive keys.<br>Many different curves exist; for webpush we need a curve called Prime 256v1 (or sometimes “P-256”). To create a new private key in Tcl we can use NaviServer like so:</p>
     <p><code>ns_crypto::eckey generate -name prime256v1 -pem MyPrivateKey.pem</code></p>
-    <p>This generates a new private key in PEM file format. This keyfile should be kept at a secure location, since anyone who has access to it could send notifications to your users. Behind the scenes naviserver uses OpenSSL for cryptography so this is essentially the same as:</p>
+    <p>This generates a new private key in PEM file format. This keyfile should be kept at a secure location, since anyone who has access to it could send notifications to your users. Behind the scenes NaviServer uses OpenSSL for cryptography so this is essentially the same as:</p>
     <p><code>openssl ecparam -name prime256v1 -genkey -noout -out MyPrivateKey.pem</code></p>
     <p>Now we want to derive a public key:</p>
     <p><code>ns_crypto::eckey pub -pem MyPrivateKey.pem -encoding base64url</code></p>
@@ -77,7 +77,7 @@
     </p>
     <p>To finish the body of the jwt you must first create a JSON formatted string of the claim without any whitespaces and newlines. The base64url encoded version of this string constitutes the body of the jwt.</p>
     </li>
-    <li><p>The header and the body of the jwt separated by a “.” make up the input for the signature. Naviserver offers a function for this:</p>
+    <li><p>The header and the body of the jwt separated by a “.” make up the input for the signature. NaviServer offers a function for this:</p>
     <p><code>ns_crypto::md vapidsign -digest sha256 -encoding base64url -pem MyPrivateKey.pem INPUT</code></p>
     <p>This uses your private key to sign the jwt. In our example <code>INPUT</code> is:</p>
     <p><code>eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJtYWlsdG86Z2VvcmdAdGVzdC5jb20iLCJhdWQiOiJodHRwczovL2ZjbS5nb29nbGVhcGlzLmNvbSIsImV4cCI6IjE1MzE4NDY2MTUifQ</code></p>
@@ -111,12 +111,12 @@
     ns_crypto::eckey generate -name prime256v1 -pem TempPrivateKey.pem<br>
     ns_crypto::eckey pub -pem TempPrivateKey.pem -encoding base64url
     </code></p>
-    <p>These keys are temporary, i.e. they should be used only once for a single push message to a single client.<br>The next step is deriving the shared secret between your server and the client. The “p256dh” field in the subscription contains the public key of the client. We use this field and our temporary private key to come to the shared secret. Using naviserver this can be done using the following command:</p>
+    <p>These keys are temporary, i.e. they should be used only once for a single push message to a single client.<br>The next step is deriving the shared secret between your server and the client. The “p256dh” field in the subscription contains the public key of the client. We use this field and our temporary private key to come to the shared secret. Using NaviServer this can be done using the following command:</p>
     <p><code>
     ns_crypto::eckey sharedsecret -pem TempPrivateKey -encoding base64url p256dh
     </code></p>
     <p>Note that this function expects binary input. The “p256dh” field in a subscription is usually in base64url format so it needs to be converted to binary first, e.g. using <code>ns_base64urldecode</code>.<br>
-    Now that we have the shared secret we can derive the encryption key and nonce. To that end a HMAC-based key derivation function (HKDF) is used repeatedly. What this function essentially does is taking a cryptographically weak input, usually a string, and making it cryptographically strong in a deterministic way. Naviserver offers this function:</p>
+    Now that we have the shared secret we can derive the encryption key and nonce. To that end a HMAC-based key derivation function (HKDF) is used repeatedly. What this function essentially does is taking a cryptographically weak input, usually a string, and making it cryptographically strong in a deterministic way. NaviServer offers this function:</p>
     <p><code>
     ns_crypto::md hkdf -digest sha256 \<br>
                 -salt   randomValues \<br>
@@ -145,7 +145,7 @@
                   32
     </code></p>
     <h4>Creating encryption key and nonce</h4>
-    <p>To create the encryption key and nonce we use again the HKDF. The first thing we need is salt. For webpush we need to create salt containing 16 random bytes. Salt should be unique for every single push message. Using naviserver this can be done as follows:</p>
+    <p>To create the encryption key and nonce we use again the HKDF. The first thing we need is salt. For webpush we need to create salt containing 16 random bytes. Salt should be unique for every single push message. Using NaviServer this can be done as follows:</p>
     <p><code> ns_crypto::randombytes -encoding binary 16 </code></p>
     <p>Next we need to generate two info strings. One for the encryption key and one for the nonce. In aesgcm these are constructed as follows:</p>
     <p>
@@ -168,7 +168,7 @@
     <h4>Padding</h4>
     <p>Padding is used to avoid potential attackers to distinguish different types of messages based on the length of the payload. In aesgcm padding consists of a 16-bit big-endian integer (two bytes) indicating how many bytes of padding there is followed by that number of null bytes. Padding is prepended to the data before encryption. Padding is optional, so you do not have to add any padding if you do not want to; however, even if you add no padding the first two bytes must then contain the integer 0 encoded in 16 bits.</p>
     <h4>Encrypting the payload</h4>
-    <p>To encrypt our payload we use the cipher aes-128-gcm. The nonce serves as an initialisation vector (iv). Our post request also needs to contain the authentication tag which is 16 bytes long for webpush. Naviserver provides encryption functionality as follows:</p>
+    <p>To encrypt our payload we use the cipher aes-128-gcm. The nonce serves as an initialisation vector (iv). Our post request also needs to contain the authentication tag which is 16 bytes long for webpush. NaviServer provides encryption functionality as follows:</p>
     <p><code>
     ns_crypto::aead::encrypt string -cipher aes-128-gcm -iv nonce -key encryptionKey -encoding binary paddedData
     </code></p>
@@ -195,8 +195,8 @@
     The record size (rs) is a 32-bit big endian integer. The final payload must be less than this number of bytes. It is allowed to simply set this to the maximum payload size of 4096. Next is the length of key that follows as 8-bit integer. Since the length of public keys for webpush is 65 this will always be the number 65 encoded in 8 bits. The last part is the temporary public key that was created for this push message. These 86 bytes need to be the first bytes in the payload of an aes128gcm request. Hence, the final form of the body should look like this:  aes128gcmheader | ciphertext | authenticationtag</li>
     <li>Encryption and crypto-key headers are not used for aes128gcm since this information is stored in the body of the request.</li>
     </ul>
-    <h2>Tcl API for Webpush and Naviserver</h2>
-    <p>We created a simple to use <a href=https://bitbucket.org/Gepro83/pushnotificationsapi/src/master/vapid.tcl> tcl API</a> that builds on naviserver which handles all of the VAPID and encryption details for you. As a user of this API all you need to do is call a single function to send a push notification to a client:</p>
+    <h2>Tcl API for Webpush and NaviServer</h2>
+    <p>We created a simple to use <a href=https://bitbucket.org/Gepro83/pushnotificationsapi/src/master/vapid.tcl> tcl API</a> that builds on NaviServer which handles all of the VAPID and encryption details for you. As a user of this API all you need to do is call a single function to send a push notification to a client:</p>
     <p><code>
     proc webpush {subscription data claim private_key_pem localKeyPath {encoding aesgcm} {timeout 2.0} {ttl 0}} {<br>
     …<br>
