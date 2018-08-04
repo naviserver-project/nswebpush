@@ -10,22 +10,25 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
 
-    <title>Realising Webpush with NaviServer</title>
+<style>
+pre {color: #e83e8c;}
+</style>
+    <title>Realising Web Push with NaviServer</title>
   </head>
   <body>
   <div class="container">
       <div class="jumbotron">
-      <h1 class="display-4">Realising Webpush with NaviServer</h1>
-      <p class="lead">This article gives an overview over the webpush protocol, VAPID and payload encryption. Additionally, we present a Tcl API that uses NaviServer's cryptographic functionality to implement webpush.</p>
+      <h1 class="display-4">Realising Web Push with NaviServer</h1>
+      <p class="lead">This article gives an overview over the Web Push protocol, VAPID and payload encryption. Additionally, we present a Tcl API that uses NaviServer's cryptographic functionality to implement Web Push.</p>
       </div>
   </div>
   <div class="container" style="max-width: 50%;">
     <h2>Introduction</h2>
-    <p>Webpush notifications are a relatively recent technology. It allows one to send messages to the user out of context of your web application, i.e. even when the respective browsertab is closed. This can be very useful for time-sensitive information or for alerting the user of some event. At the time of writing (2018) this feature is supported by Google Chrome and Mozilla Firefox. For mobile devices, currently, only the Android operation system supports it.</p>
-    <p><a href=https://github.com/web-push-libs>Libraries</a> in various languages exist that hide the implementation details of webpush, however, as far as we know, no open source Tcl implementation exists so far. In this article we describe how we filled that gap using <a href=https://NaviServer.sourceforge.io>NaviServer</a> and created a simple API open for anyone to use.
+    <p>Web Push notifications are a relatively recent technology. It allows one to send messages to the user out of context of your web application, i.e. even when the respective browsertab is closed. This can be very useful for time-sensitive information or for alerting the user of some event. At the time of writing (2018) this feature is supported by Google Chrome and Mozilla Firefox. For mobile devices, currently, only the Android operation system supports it.</p>
+    <p><a href=https://github.com/web-push-libs>Libraries</a> in various languages exist that hide the implementation details of Web Push, however, as far as we know, no open source Tcl implementation exists so far. In this article we describe how we filled that gap using <a href=https://NaviServer.sourceforge.io>NaviServer</a> and created a simple API open for anyone to use.
     </p>
     <p>The <a href=https://tools.ietf.org/html/draft-ietf-webpush-protocol-12>Web Push Protocol</a> is a standard that specifies how the delivery of such messages works. Both Chrome and Firefox implement this protocol, so your application does not have to distinguish which browser your user is working with. Before we get into details how it works we are going to define some terms.</p>
-    <h3>Webpush Terminology</h3>
+    <h3>Web Push Terminology</h3>
     <ul>
     <li> A <b>notification</b> is a message to the user that appears outside of the normal user interface, e.g. in the bottom left of the desktop instead of inside the browser.</li>
     <li> A <b>push message</b> is the message that is sent over the internet from the server to the client. These messages often follow the fire-and-forget pattern, however, it is also possible to specify a lifetime up to 28 days, i.e. they are delivered on the next start of the browser.</li>
@@ -34,15 +37,14 @@
     </ul>
     <h2>The Web Push Protocol</h2>
     In essence, the Web Push Protocol works as follows: The client subscribes to your push notifications using a public key which identifies your application. This is done using the <a href=https://developer.mozilla.org/en-US/docs/Web/API/Push_API>Push API</a> implemented by the browser (based on the <a href=https://developer.mozilla.org/de/docs/Web/API/Service_Worker_API>Service Worker API</a>). The result of this process is a subscription that usually looks something like this:
-    <p><code>
-    {<br>
-      &nbsp;"endpoint": "https://fcm.googleapis.com/fcm/send/fKx5MYaL80w:APA91bF3ssm...",<br>
-      &nbsp;"keys": {<br>
-        &nbsp;&nbsp;"p256dh": "BP0n1og3aSVEUu1dlovLK_wIa9qkqJpsJ…",<br>
-        &nbsp;&nbsp;"auth": "By49Q9zIMeIt376ycxbq-w"<br>
-        &nbsp;}<br>
-    }<br>
-    </code></p>
+    <p><pre>
+    {
+      "endpoint": "https://fcm.googleapis.com/fcm/send/fKx5MYaL80w:APA91bF3ssm...",
+      "keys": {
+         "p256dh": "BP0n1og3aSVEUu1dlovLK_wIa9qkqJpsJ…",
+         "auth": "By49Q9zIMeIt376ycxbq-w"
+      }
+    }</pre></p>
     <p>
     This subscription uniquely identifies the client device and browser. Your application server must collect and save these subscriptions since you need them every time you want to send a push message. The endpoint is the url where you will send your post request to in order to trigger a push notification. The keys field is needed for data bearing push messages, which we explain more detailed in a later section.
     </p>
@@ -51,23 +53,33 @@
     For a push service to forward your message to the client it needs to be certain that it actually came from you. This is ensured through a <a href=https://jwt.io/>JSON Web Token</a> (jwt) that must be included in the header of every push message. This jwt must be created according to the <a href=https://tools.ietf.org/id/draft-ietf-webpush-vapid-03.html>VAPID specification</a>.
     </p>
     <h4>Generating VAPID keys</h4>
-    <p>The first thing you will need is a private key that is used for identification. The webpush and VAPID encryption mechanism uses the elliptic-curve Diffie-Hellman (ecdh) protocol for key agreement. We will not go into detail here how it works, just note that this algorithm uses geometric curves to derive keys.<br>Many different curves exist; for webpush we need a curve called Prime 256v1 (or sometimes “P-256”). To create a new private key in Tcl we can use NaviServer like so:</p>
-    <p><code>ns_crypto::eckey generate -name prime256v1 -pem MyPrivateKey.pem</code></p>
+    <p>The first thing you will need is a private key that is used for identification. The Web Push and VAPID encryption mechanism uses the elliptic-curve Diffie-Hellman (ecdh) protocol for key agreement. We will not go into detail here how it works, just note that this algorithm uses geometric curves to derive keys.<br>Many different curves exist; for Web Push we need a curve called Prime 256v1 (or sometimes “P-256”). To create a new private key in Tcl we can use NaviServer like so:</p>
+    <p><pre>
+    ns_crypto::eckey generate \
+        -name prime256v1 \
+        -pem MyPrivateKey.pem</pre></p>
     <p>This generates a new private key in PEM file format. This keyfile should be kept at a secure location, since anyone who has access to it could send notifications to your users. Behind the scenes NaviServer uses OpenSSL for cryptography so this is essentially the same as:</p>
-    <p><code>openssl ecparam -name prime256v1 -genkey -noout -out MyPrivateKey.pem</code></p>
+    <p><pre>
+    openssl ecparam \
+        -name prime256v1 \
+        -genkey -noout \
+        -out MyPrivateKey.pem</pre></p>
     <p>Now we want to derive a public key:</p>
-    <p><code>ns_crypto::eckey pub -pem MyPrivateKey.pem -encoding base64url</code></p>
-    <p>This gives us the corresponding public key in DER format base64url encoded. Note that this is not exactly the same output as OpenSSL’s -pubout function. The first few bytes in the standard PEM format define which curve is used. Since this is clear for webpush by specification this is left out for public keys. Public keys are 65 bytes long, hence, the corresponding OpenSSl command is:</p>
+    <p><pre>
+    ns_crypto::eckey pub \
+        -pem MyPrivateKey.pem \
+        -encoding base64url</pre></p>
+    <p>This gives us the corresponding public key in DER format base64url encoded. Note that this is not exactly the same output as OpenSSL’s -pubout function. The first few bytes in the standard PEM format define which curve is used. Since this is clear for Web Push by specification this is left out for public keys. Public keys are 65 bytes long, hence, the corresponding OpenSSl command is:</p>
     <p><code> openssl ec -in MyPrivateKey.pem -pubout -outform DER | tail -c 65 | base64 | tr -d '=' | tr '/+' '-_'</code></p>
     <p>This key pair identifies your application to the push service. The client uses the public key in the subscription process and you prove your identity to the push service by signing a jwt with your private key for each request.</p>
     <h4>Signing a jwt</h4>
     <p>A jwt consists of three parts: header, payload and signature. These are separated by dots, so a typical jwt looks like this:</p>
     <p><code>xx.yy.zz</code></p>
     <ol>
-    <li><p>For webpush the first part is always the same. It contains the string <code>{typ:"JWT",alg:"ES256"}</code> base64url encoded which is <code>eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9</code></p></li>
+    <li><p>For Web Push the first part is always the same. It contains the string <code>{typ:"JWT",alg:"ES256"}</code> base64url encoded which is <code>eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9</code></p></li>
     <li><p>The payload consists of a JSON object containing a set of claims. For the above token the following claims were used:</p>
-    <p><code>{"sub":"mailto:georg@test.com","aud":"https://fcm.googleapis.com","exp":"1531846615"}
-      </code></p>
+    <p><pre>{"sub":"mailto:georg@test.com","aud":"https://fcm.googleapis.com","exp":"1531846615"}
+      </pre></p>
     <p>These three fields are mandatory. They are specified as follows:
     <ol>
     <li><code>sub</code> contains an address to contact your administrators. This is usually a mailto or a website. The push service providers will use this if something goes wrong with your feed.</li>
@@ -78,7 +90,12 @@
     <p>To finish the body of the jwt you must first create a JSON formatted string of the claim without any whitespaces and newlines. The base64url encoded version of this string constitutes the body of the jwt.</p>
     </li>
     <li><p>The header and the body of the jwt separated by a “.” make up the input for the signature. NaviServer offers a function for this:</p>
-    <p><code>ns_crypto::md vapidsign -digest sha256 -encoding base64url -pem MyPrivateKey.pem INPUT</code></p>
+    <p><pre>
+    ns_crypto::md vapidsign \
+        -digest sha256 \
+        -encoding base64url \
+        -pem MyPrivateKey.pem \
+        INPUT</pre></p>
     <p>This uses your private key to sign the jwt. In our example <code>INPUT</code> is:</p>
     <p><code>eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJtYWlsdG86Z2VvcmdAdGVzdC5jb20iLCJhdWQiOiJodHRwczovL2ZjbS5nb29nbGVhcGlzLmNvbSIsImV4cCI6IjE1MzE4NDY2MTUifQ</code></p>
     <p>The result is the final part of the jwt which is appended after another “.”. Our final jwt looks as follows:</p>
@@ -91,14 +108,13 @@
     <p><code>vapid t=eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJtYWlsdG86Z2VvcmdAdGVzdC5jb20iLCJhdWQiOiJodHRwczovL2ZjbS5nb29nbGVhcGlzLmNvbSIsImV4cCI6IjE1MzE4NDY2MTUifQ.0hnVHb0ylGKqT6vTSm95V2nvVbeSRRFnqHA2xlOmdBPRL_C40R9QurRxt9p0pOakeEqQo1Ge0qC00XoOVTB_Eg,k=BFzhXP5G5Pp5xmEfESPsd7L6N2oQZZypGd2tUR5diW9spzJFs5DXaUuM1iMVfZGunUhtHkyYjqPfcQ2bfzKzbeY</code></p>
     <p>Note that there are no newlines in this string; they are inserted here just for readability purposes. The last thing we need is to set the TTL header. This the time-to-live in seconds of the push message. If the user is not online the push service will retain the message for that amount of time, delivering it as soon as the user comes back. The maximum TTL value varies between push services but is usually about one month. In the response of the post request you receive the TTL value that was set by the push service. If the return value is lower than the value you sent you know that you reached the maximum.<br>
     We are now able to send push notifications to a user. The following curl command shows an example post request:</p>
-    <p><code>
-    curl -v -X POST\<br>
-      -H "Authorization: vapid t=eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJzdW..."\<br>
-      -H "TTL: 0"\<br>
-      "https://fcm.googleapis.com/fcm/send/fKx5MYaL80w:APA91bF3ssm..."
-    </code></p>
+    <p><pre>
+    curl -v -X POST \
+      -H "Authorization: vapid t=eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJzdW..." \
+      -H "TTL: 0" \
+      "https://fcm.googleapis.com/fcm/send/fKx5MYaL80w:APA91bF3ssm..."</pre></p>
     <p>Note that the body of the post request is empty. This is a push message without payload, i.e. the client receives a push event but without any added data. Push messages with payload require more sophisticated encryption which we are going to describe in the next section. </p>
-    <h2>Payload Encryption for Webpush</h2>
+    <h2>Payload Encryption for Web Push</h2>
     <p>To send a push message with payload proper encryption is required. This ensures that your data can only be read by the client that receives the message, i.e. also the push service has no access. Here is a rough overview of the necessary steps:</p>
     <ol>
     <li>Generate a new set of keys for each message.</li>
@@ -107,28 +123,33 @@
     <li>Format a post request according to a given encoding scheme (we will cover aesgcm and the newer aes128gcm)</li>
     </ol>
     <p>For every data bearing push message it is necessary to generate a new pair of keys. We do this the same way we did for VAPID:</p>
-    <p><code>
-    ns_crypto::eckey generate -name prime256v1 -pem TempPrivateKey.pem<br>
-    ns_crypto::eckey pub -pem TempPrivateKey.pem -encoding base64url
-    </code></p>
+    <p><pre>
+    ns_crypto::eckey generate \
+        -name prime256v1 \
+        -pem TempPrivateKey.pem
+    ns_crypto::eckey pub \
+        -pem TempPrivateKey.pem \
+        -encoding base64url</pre></p>
     <p>These keys are temporary, i.e. they should be used only once for a single push message to a single client.<br>The next step is deriving the shared secret between your server and the client. The “p256dh” field in the subscription contains the public key of the client. We use this field and our temporary private key to come to the shared secret. Using NaviServer this can be done using the following command:</p>
-    <p><code>
-    ns_crypto::eckey sharedsecret -pem TempPrivateKey -encoding base64url p256dh
-    </code></p>
+    <p><pre>
+    ns_crypto::eckey sharedsecret \
+        -pem TempPrivateKey \
+        -encoding base64url \
+        p256dh
+    </pre></p>
     <p>Note that this function expects binary input. The “p256dh” field in a subscription is usually in base64url format so it needs to be converted to binary first, e.g. using <code>ns_base64urldecode</code>.<br>
     Now that we have the shared secret we can derive the encryption key and nonce. To that end a HMAC-based key derivation function (HKDF) is used repeatedly. What this function essentially does is taking a cryptographically weak input, usually a string, and making it cryptographically strong in a deterministic way. NaviServer offers this function:</p>
-    <p><code>
-    ns_crypto::md hkdf -digest sha256 \<br>
-                -salt   randomValues \<br>
-                -secret inputKeyMaterial \<br>
-                -info   infostring \<br>
-                -encoding binary \<br>
-                  32
-    </code></p>
-    <p>Salt is a random value that adds cryptographic strength to the output. The secret parameter contains the input key material. Info is optional and contains application specific information. HKDF can create outputs of arbitrary length up to 255 times as long as the hash used (SHA-256 for webpush). It is specified as 32 in the above example.<br>
+    <p><pre>
+    ns_crypto::md hkdf -digest sha256 \
+        -salt     randomValues \
+        -secret   inputKeyMaterial \
+        -info     infostring \
+        -encoding binary \
+        32</pre></p>
+    <p>Salt is a random value that adds cryptographic strength to the output. The secret parameter contains the input key material. Info is optional and contains application specific information. HKDF can create outputs of arbitrary length up to 255 times as long as the hash used (SHA-256 for Web Push). It is specified as 32 in the above example.<br>
     How exactly the input key material and infostring are created and HKDF is used varies between the encoding schemes which is why we are going to look at them separately.</p>
     <h3>Encryption parameters in aesgcm</h3>
-    <p>At the time of writing, <a href=https://tools.ietf.org/id/draft-ietf-webpush-encryption-04.html>aesgcm</a> is the most common encoding scheme for webpush. The first step is to create the input key material (ikm). This is the first use of the HKDF function. The parameters for it must be set as follows:</p>
+    <p>At the time of writing, <a href=https://tools.ietf.org/id/draft-ietf-webpush-encryption-04.html>aesgcm</a> is the most common encoding scheme for Web Push. The first step is to create the input key material (ikm). This is the first use of the HKDF function. The parameters for it must be set as follows:</p>
     <ul>
     <li><em>salt</em>: The “auth” field of the subscription is used here. Note that <code>ns_crypto::md hkdf</code> expects this parameter in binary format.</li>
     <li><em>secret</em>: The shared secret derived from the client public key (“p256dh” of subscription) and our temporary private key again in binary format</li>
@@ -136,42 +157,46 @@
     <li><em>length</em>: The length of the input key material must be 32 bytes</li>
     </ul>
     <p>In code it looks something like this:</p>
-    <p><code>
-    ns_crypto::md hkdf -digest sha256 \<br>
-                -salt   auth \<br>
-                -secret sharedSecret \<br>
-                -info   “Content-Encoding auth\x00” \<br>
-                -encoding binary \<br>
-                  32
-    </code></p>
+    <p><pre>
+    ns_crypto::md hkdf -digest sha256 \
+        -salt   auth \
+        -secret sharedSecret \
+        -info   “Content-Encoding auth\x00” \
+        -encoding binary \
+         32</pre></p>
     <h4>Creating encryption key and nonce</h4>
-    <p>To create the encryption key and nonce we use again the HKDF. The first thing we need is salt. For webpush we need to create salt containing 16 random bytes. Salt should be unique for every single push message. Using NaviServer this can be done as follows:</p>
-    <p><code> ns_crypto::randombytes -encoding binary 16 </code></p>
+    <p>To create the encryption key and nonce we use again the HKDF. The first thing we need is salt. For Web Push we need to create salt containing 16 random bytes. Salt should be unique for every single push message. Using NaviServer this can be done as follows:</p>
+    <p><pre>
+    ns_crypto::randombytes -encoding binary 16 </pre></p>
     <p>Next we need to generate two info strings. One for the encryption key and one for the nonce. In aesgcm these are constructed as follows:</p>
     <p>
     “Content-Encoding: “ followed by either “aesgcm” or “nonce” followed by one null byte followed by “P-256” followed by one null byte followed by the length of the client public key as a 16-bit big-endian integer (this integer should always have the value 65) followed by the client public key (contents of the “p256dh” field in binary format) followed by the length of the temporary server public key as a 16-bit big-endian integer (again 65) followed by the temporary server public key in binary format.
     </p>
     <p>Hence, this string contains the public key we created previously solely for encrypting a single push message. Now we have all ingredients to construct the encryption key and nonce:</p>
-    <p><code>
-    set key [ns_crypto::md hkdf -digest sha256 \<br>
-    &nbsp;-salt salt \<br>
-    &nbsp;-secret ikm \<br>
-    &nbsp;-info keyInfoString \<br>
-    &nbsp;-encoding binary 16]<br><br>
-    set nonce [ns_crypto::md hkdf -digest sha256 \<br>
-    &nbsp;-salt salt \<br>
-    &nbsp;-secret ikm \<br>
-    &nbsp;-info nonceInfoString \<br>
-    &nbsp;-encoding binary 12]
-    </code></p>
+    <p><pre>
+    set key [ns_crypto::md hkdf -digest sha256 \
+        -salt salt \
+        -secret ikm \
+        -info keyInfoString \
+        -encoding binary 16]
+
+    set nonce [ns_crypto::md hkdf -digest sha256 \
+        -salt salt \
+        -secret ikm \
+        -info nonceInfoString \
+        -encoding binary 12]</pre></p>
     <p>The length of the encryption key is 16 bytes whereas the length of the nonce is 12 bytes. The secret parameter <code>ikm</code> refers to the input key material created in the previous step.</p>
     <h4>Padding</h4>
     <p>Padding is used to avoid potential attackers to distinguish different types of messages based on the length of the payload. In aesgcm padding consists of a 16-bit big-endian integer (two bytes) indicating how many bytes of padding there is followed by that number of null bytes. Padding is prepended to the data before encryption. Padding is optional, so you do not have to add any padding if you do not want to; however, even if you add no padding the first two bytes must then contain the integer 0 encoded in 16 bits.</p>
     <h4>Encrypting the payload</h4>
-    <p>To encrypt our payload we use the cipher aes-128-gcm. The nonce serves as an initialisation vector (iv). Our post request also needs to contain the authentication tag which is 16 bytes long for webpush. NaviServer provides encryption functionality as follows:</p>
-    <p><code>
-    ns_crypto::aead::encrypt string -cipher aes-128-gcm -iv nonce -key encryptionKey -encoding binary paddedData
-    </code></p>
+    <p>To encrypt our payload we use the cipher aes-128-gcm. The nonce serves as an initialisation vector (iv). Our post request also needs to contain the authentication tag which is 16 bytes long for Web Push. NaviServer provides encryption functionality as follows:</p>
+    <p><pre>
+    ns_crypto::aead::encrypt string \
+        -cipher aes-128-gcm \
+        -iv nonce \
+        -key encryptionKey \
+        -encoding binary
+         paddedData</pre></p>
     <p>This returns a dictionary containing the ciphertext (“bytes”) and the authentication tag (“tag”). The body of the post request must contain the ciphertext followed by the tag. For one request the maximum payload size is 4096 bytes. Hence, you have 4078 bytes for your data: 4096 - 16 for the tag - 2 for mandatory padding length. Note that for some endpoints, e.g. on various mobile devices, the maximum payload size might actually be lower than these 4096 bytes.</p>
     <h4>Formatting headers in aesgcm</h4>
     <p>The post request for a push message with payload must contain these headers:</p>
@@ -184,7 +209,7 @@
     <p>mySalt is the salt we used in the encryption process. tempPubKey is the public key of the keypair we created for this one message. Both parameters need to be encoded in base64url format. Since we send the data in raw binary we set the content-type to application/octet-stream. The body of the post request contains our encrypted data (ciphertext plus authentication tag).<br>
     To identify yourself you also need to add the authorization header containing your VAPID details. As in requests without payload the TTL header needs to be set as well.</p>
     <h3>Encryption parameters in aes128gcm</h3>
-    <p><a href=https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-09>Aes128gcm</a> is the newest encoding that is used for webpush. It came out in 2017 so some push services might not support it yet (Chrome and Firefox do). We will only highlight the differences to aesgcm:</p>
+    <p><a href=https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-09>Aes128gcm</a> is the newest encoding that is used for Web Push. It came out in 2017 so some push services might not support it yet (Chrome and Firefox do). We will only highlight the differences to aesgcm:</p>
     <ul>
     <li><p>The infostring for the initial HKDF call that creates the initial key material differs from aesgcm. In aesgcm this string was “Content-Encoding: auth\x00”. For aes128gcm this string also contains the client and server public keys in binary format. It is constructed as follows:</p>
     <p>“WebPush: info” followed by a null byte followed by the client public key (“p256dh”) in binary format followed by the temporary server public key in binary format.</p></li>
@@ -192,16 +217,18 @@
     <li>Padding is appended (in contrast to prepended in aesgcm) to the data in aes128gcm. A delimiter octet “\x02” is expected between the data and the padding. The padding itself again consists of null bytes.</li>
     <li><p>The salt and temporary server public key are prepended as a header to the ciphertext and tag in the body of the post request. The header consists of the following:</p>
     <p>salt (16bytes) | rs (4 bytes) | pubKeyLen (1 byte) | pubKey (65 bytes)</p>
-    The record size (rs) is a 32-bit big endian integer. The final payload must be less than this number of bytes. It is allowed to simply set this to the maximum payload size of 4096. Next is the length of key that follows as 8-bit integer. Since the length of public keys for webpush is 65 this will always be the number 65 encoded in 8 bits. The last part is the temporary public key that was created for this push message. These 86 bytes need to be the first bytes in the payload of an aes128gcm request. Hence, the final form of the body should look like this:  aes128gcmheader | ciphertext | authenticationtag</li>
+    The record size (rs) is a 32-bit big endian integer. The final payload must be less than this number of bytes. It is allowed to simply set this to the maximum payload size of 4096. Next is the length of key that follows as 8-bit integer. Since the length of public keys for Web Push is 65 this will always be the number 65 encoded in 8 bits. The last part is the temporary public key that was created for this push message. These 86 bytes need to be the first bytes in the payload of an aes128gcm request. Hence, the final form of the body should look like this:  aes128gcmheader | ciphertext | authenticationtag</li>
     <li>Encryption and crypto-key headers are not used for aes128gcm since this information is stored in the body of the request.</li>
     </ul>
-    <h2>Tcl API for Webpush and NaviServer</h2>
+    <h2>Tcl API for Web Push and NaviServer</h2>
     <p>We created a simple to use <a href=https://bitbucket.org/Gepro83/pushnotificationsapi/src/master/vapid.tcl> tcl API</a> that builds on NaviServer which handles all of the VAPID and encryption details for you. As a user of this API all you need to do is call a single function to send a push notification to a client:</p>
-    <p><code>
-    proc webpush {subscription data claim private_key_pem localKeyPath {encoding aesgcm} {timeout 2.0} {ttl 0}} {<br>
-    …<br>
-    } <br>
-    </code></p>
+    <p><pre>
+    proc webpush {
+       subscription data claim private_key_pem
+       localKeyPath {encoding aesgcm} {timeout 2.0} {ttl 0}} {
+    …
+    }
+    </pre></p>
     <p>The <code>subscription</code> parameter is a dict that contains at least an “endpoint”. If you want to send push notifications with payload this dict also needs to contain an “auth” and a “p256dh” field. Note that this is not a nested dictionary as the standard JSON subscription object, i.e. no “keys” field is expected.<br>
     <code>data</code> contains the data you want to send as a payload. Make sure not to exceed that maximum payload size, otherwise an exception will be thrown.<br>
     <code>claim</code> is a dict containing at least a “sub” field. If “aud” and “exp” fields exist they will be validated, otherwise the will be extracted from the endpoint respectively set to a default.<br>
@@ -213,14 +240,16 @@
     And that is all you need to do to successfully send a push message to a client. Of course, the public key the client subscribed to must match the private key used here.</p>
     <h3>Decryption</h3>
     <p>If you want to write your own client or want to use this encryption scheme for other purposes you can also use our API to decrypt messages using the following function:</p>
-    <p><code>
-    proc decrypt {encrData privKeyPem ServerPubKey auth salt encoding} {<br>
-    …<br>
+    <p><pre>
+    proc decrypt {
+        encrData privKeyPem ServerPubKey
+        auth salt encoding} {
+       …
     }
-    </code></p>
+    </pre>
     <p>As input you need the encrypted data, the private key matching the public key that was used for encryption, i.e. the private key matching the public key in “p256dh” and the auth as well as the salt used for encryption. Currently supported encodings are “aesgcm” and “aes128gcm”.</p>
     <h2>Conclusion</h2>
-    <p>Hopefully we could shed some light on how the webpush protocol as well as payload encryption works. Of course, one could simply use on of the available libraries and be done with it, however, it is often good to understand what is actually happening in order to evaluate all risks of a new technology appropriately. </p>
+    <p>Hopefully we could shed some light on how the Web Push protocol as well as payload encryption works. Of course, one could simply use on of the available libraries and be done with it, however, it is often good to understand what is actually happening in order to evaluate all risks of a new technology appropriately. </p>
   </div>
   </body>
 </html>
