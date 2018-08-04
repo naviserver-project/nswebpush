@@ -178,14 +178,17 @@ pre {color: #e83e8c;}
         -salt salt \
         -secret ikm \
         -info keyInfoString \
-        -encoding binary 16]
+        -encoding binary \
+        16]
 
     set nonce [ns_crypto::md hkdf -digest sha256 \
         -salt salt \
         -secret ikm \
         -info nonceInfoString \
-        -encoding binary 12]</pre></p>
-    <p>The length of the encryption key is 16 bytes whereas the length of the nonce is 12 bytes. The secret parameter <code>ikm</code> refers to the input key material created in the previous step.</p>
+        -encoding binary \
+        12]</pre></p>
+    <p>The length of the encryption key is 16 bytes whereas the length of the nonce is 12 bytes.
+    The secret parameter <code>ikm</code> refers to the input key material created in the previous step.</p>
     <h4>Padding</h4>
     <p>Padding is used to avoid potential attackers to distinguish different types of messages based on the length of the payload. In aesgcm padding consists of a 16-bit big-endian integer (two bytes) indicating how many bytes of padding there is followed by that number of null bytes. Padding is prepended to the data before encryption. Padding is optional, so you do not have to add any padding if you do not want to; however, even if you add no padding the first two bytes must then contain the integer 0 encoded in 16 bits.</p>
     <h4>Encrypting the payload</h4>
@@ -221,14 +224,18 @@ pre {color: #e83e8c;}
     <li>Encryption and crypto-key headers are not used for aes128gcm since this information is stored in the body of the request.</li>
     </ul>
     <h2>Tcl API for Web Push and NaviServer</h2>
-    <p>We created a simple to use <a href=https://bitbucket.org/Gepro83/pushnotificationsapi/src/master/vapid.tcl> tcl API</a> that builds on NaviServer which handles all of the VAPID and encryption details for you. As a user of this API all you need to do is call a single function to send a push notification to a client:</p>
+    <p>We created a simple to use <a href=https://bitbucket.org/Gepro83/pushnotificationsapi/src/master/vapid.tcl>Tcl API</a> that builds on NaviServer which handles all of the VAPID and encryption details for you. As a user of this API all you need to do is call a single function to send a push notification to a client:</p>
     <p><pre>
-    proc webpush {
-       subscription data claim private_key_pem
-       localKeyPath {encoding aesgcm} {timeout 2.0} {ttl 0}} {
-    …
-    }
-    </pre></p>
+    webpush::send \
+       -subscription /subscription/ \
+       -data /data/ \
+       -claim /claim/ \
+       -private_key_pem /private_key_pem/ \
+       -localKeyPath /localKeyPath/ \
+       ?-encoding /encoding/? \
+       ?-timeout /timeout/?\
+       ?-ttl /ttl/?</pre></p>
+    
     <p>The <code>subscription</code> parameter is a dict that contains at least an “endpoint”. If you want to send push notifications with payload this dict also needs to contain an “auth” and a “p256dh” field. Note that this is not a nested dictionary as the standard JSON subscription object, i.e. no “keys” field is expected.<br>
     <code>data</code> contains the data you want to send as a payload. Make sure not to exceed that maximum payload size, otherwise an exception will be thrown.<br>
     <code>claim</code> is a dict containing at least a “sub” field. If “aud” and “exp” fields exist they will be validated, otherwise the will be extracted from the endpoint respectively set to a default.<br>
