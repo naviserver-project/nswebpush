@@ -6,7 +6,7 @@ package require uri
 #
 # subscribtion is expected to be a dict that includes at least an "endpoint"
 # for data bearing subscriptions an "auth" and a "p256dh" fields are expected (these fields should expect the base64url encoded values)
-# claim is a dict containing at least a "sub" field that contains a "mailto:example@example.org" email adress
+# claim is a dict containing at least a "sub" field that contains a "mailto:example@example.org" email address
 # the "aud" of the claim will be extracted from the endpoint if not provided
 # "exp" will be set to +24hours from the time of the function call if not provided
 #
@@ -95,7 +95,7 @@ proc webpush {subscription data claim private_key_pem localKeyPath {encoding aes
 }
 # creates a new EC private key pem file at the given location
 # overwrites the file if it exists
-# returns the path if successfull
+# returns the path if successful
 proc createPrivateKeyPem {path} {
   if {[file exists $path]} {
     file delete -force $path

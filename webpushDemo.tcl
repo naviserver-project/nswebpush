@@ -10,7 +10,7 @@ if {$subscription ne ""} {
   # subscription will be in json
   set subscrDict [::json::json2dict $subscription]
   set keys [dict get $subscrDict keys]
-  # transform to correctly formated tcl dict
+  # transform to correctly formatted tcl dict
   set subscription [subst {endpoint [dict get $subscrDict endpoint] auth [dict get $keys auth] p256dh [dict get $keys p256dh]}]
   # private key is here
   set privPem "[ns_info home]/modules/vapid/prime256v1_key.pem"

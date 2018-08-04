@@ -40,7 +40,7 @@ namespace eval ::Test {
       if {$aud eq "https://updates.push.services.mozilla.com"} {
         append result 1
       }
-      # endpoint and 'aud' missmatch
+      # endpoint and 'aud' mismatch
       append result [catch {validateClaim [subst {sub $validMail aud "abc"}] $validEndpoint}]
     } -result {11111}
 
@@ -56,14 +56,15 @@ namespace eval ::Test {
       append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] "" $::vapidCertPath}]
       # private key not a pem file
       append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] $::vapidCertPath/public_key.txt $::vapidCertPath}]
-      # invalid email adress
+      # invalid email address
       append result [catch {webpush $validEndpoint "" {sub maito:testtest} $validPem $::vapidCertPath}]
       # auth and p256dh missing in subscription for data bearing Webpush
       append result [catch {webpush $validEndpoint "testdata" [subst {sub $validMail}] $validPem $::vapidCertPath}]
       # invalid Encoding
       append result [catch {webpush $validEndpoint "" [subst {sub $validMail}] $validPem $::vapidCertPath abcencoding}]
     } -result {111111}
-    # positive tests fro parameter formating
+
+    # positive tests for parameter formatting
     test webpush-cannotconnect {} -body {
       set validMail {mailto:georg@test.com}
       # this is only a valid formatting, the endpoint does not exist
