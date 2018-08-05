@@ -210,15 +210,6 @@ namespace eval webpush {
     } -result {1}
 
 
-    test pem-1.1 {createPublicKeyPem} -body {
-	set privkey [createPrivateKeyPem $::vapidCertPath/localpriv.pem]
-	createPublicKeyPem $::vapidCertPath/localpub.pem $privkey
-	if {[file exists $::vapidCertPath/localpub.pem]} {
-	    set result 1
-	}
-    } -result {1}
-
-
     # input/output for encryption functions from node.js crypto library
     # see "test.js"
     test generateInfo-1.0 {} -body {
