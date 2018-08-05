@@ -534,7 +534,7 @@ namespace eval webpush {
 	# make initial key material
 	#
 	set localPub [ns_crypto::eckey pub -pem $privateKeyPem -encoding binary]
-	set ikm [makeIkm $auth $localPub $serverPubKey $sharedSecret $contentEncoding]
+	set ikm [makeIkm $auth $localPub $serverPubKey $sharedSecret $mode]
 
 	#
 	# create encryption key and nonce
