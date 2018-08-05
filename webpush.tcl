@@ -9,9 +9,9 @@ namespace eval webpush {
 	-subscription
 	-data
 	-claim
-	-private_key_pem
+	-privateKeyPem
 	-localKeyPath
-	{-encoding aesgcm}
+	{-contentEncoding aesgcm}
 	{-timeout 2.0}
 	{-ttl 0}
     } {
@@ -28,7 +28,7 @@ namespace eval webpush {
 	# "exp" will be set to +24hours from the time of the function
 	# call if not provided
 	#
-	# @param private_key_pem is the path to a pem file containing
+	# @param privateKeyPem is the path to a pem file containing
 	#        a VAPID EC private key
 	#
 	# @pram localKeyPath is a path to a directory with write
@@ -41,7 +41,7 @@ namespace eval webpush {
 	#
 	# @param ttl is the time to live of the push message
 
-	if {$encoding ni {aesgcm aes128gcm}} {
+	if {$contentEncoding ni {aesgcm aes128gcm}} {
 	    error "Unknown encoding"
 	}
 	# validate subscription
@@ -55,7 +55,7 @@ namespace eval webpush {
 	# validate private key and create public key in base64url
 	# encoded format
 	#
-	set server_public_key [ns_crypto::eckey pub -pem $private_key_pem -encoding base64url]
+	set server_public_key [ns_crypto::eckey pub -pem $privateKeyPem -encoding base64url]
 
 	#
 	# validate/fill claim
@@ -65,7 +65,7 @@ namespace eval webpush {
 	#
 	# create a signed jwt token
 	#
-	set jwt [makeJWT $claim $private_key_pem]
+	set jwt [makeJWT $claim $privateKeyPem]
 
 	#
 	# create vapid Authorization header
@@ -101,7 +101,7 @@ namespace eval webpush {
 	    # salt is needed for encryption.
 	    #
 	    set salt [ns_crypto::randombytes -encoding binary 16]
-	    if {$encoding eq "aesgcm"} {
+	    if {$contentEncoding eq "aesgcm"} {
 		#
 		# public key used for encryption needs to be appended
 		# to the crypt-key header.  The keyid field links the
@@ -123,18 +123,18 @@ namespace eval webpush {
 	    #
 	    # Set content-encoding and content-type headers.
 	    #
-	    ns_set update $headers "content-encoding" $encoding
+	    ns_set update $headers "content-encoding" $contentEncoding
 	    ns_set update $headers "content-type" application/octet-stream
 
 	    #
 	    # encrypt the data
 	    #
-	    set encrData [encrypt $data \
-			      $localPrivateKeyPem \
-			      [ns_base64urldecode [dict get $subscription auth]] \
-			      [ns_base64urldecode [dict get $subscription p256dh]] \
-			      $salt \
-			      $encoding]
+	    set encrData [encrypt -data $data \
+			      -privateKeyPem $localPrivateKeyPem \
+			      -auth [ns_base64urldecode [dict get $subscription auth]] \
+			      -p256dh [ns_base64urldecode [dict get $subscription p256dh]] \
+			      -salt $salt \
+			      -contentEncoding $contentEncoding]
 	    #
 	    # content-length header is the length of the encrypted data in bytes
 	    #
@@ -247,7 +247,7 @@ namespace eval webpush {
 	return $claim
     }
 
-    proc makeJWT {claim private_key_pem} {
+    proc makeJWT {claim privateKeyPem} {
 	#
 	# Take a claim and the path to an EC private key and creates
 	# a signed JWT token. Whitespace and newlines are stripped
@@ -260,7 +260,7 @@ namespace eval webpush {
 	set JWTbody [ns_base64urlencode [dictToJson $claim]]
 
 	set signature [::ns_crypto::md vapidsign -digest sha256\
-			   -encoding base64url -pem $private_key_pem $JWTHeader.$JWTbody ]
+			   -encoding base64url -pem $privateKeyPem $JWTHeader.$JWTbody ]
 	return $JWTHeader.$JWTbody.$signature
     }
 
@@ -381,7 +381,14 @@ namespace eval webpush {
 	return $result
     }
 
-    proc encrypt {data privKeyPem auth p256dh salt encoding} {
+    nsf::proc encrypt {
+      -data
+      -privateKeyPem
+      -auth
+      -p256dh
+      -salt
+      -contentEncoding
+    } {
 	#
 	# Encrypt the data using a private key from a pem file, the
 	# auth and p256dh fields of a subscription and a 16 byte
@@ -397,32 +404,32 @@ namespace eval webpush {
 	if {[string bytelength $data] > 4078} {
 	    error "data is too large, maximum is 4078 bytes!"
 	}
-	set ServerPubKey [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
-	set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $p256dh]
+	set ServerPubKey [ns_crypto::eckey pub -pem $privateKeyPem -encoding binary]
+	set sharedSecret [ns_crypto::eckey sharedsecret -pem $privateKeyPem -encoding binary $p256dh]
 
 	#
 	# Make initial key material.
 	#
-	set ikm [makeIkm $auth $p256dh $ServerPubKey $sharedSecret $encoding]
+	set ikm [makeIkm $auth $p256dh $ServerPubKey $sharedSecret $contentEncoding]
 
 	#
 	# Create encryption key and nonce
 	#
-	set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt $encoding]
+	set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt $contentEncoding]
 	set key [lindex $keyNonce 0]
 	set nonce [lindex $keyNonce 1]
 
 	#
 	# Do encryption:
 	#
-	set paddedData [padData $encoding $data]
+	set paddedData [padData $contentEncoding $data]
 	set cipher [::ns_crypto::aead::encrypt string -cipher aes-128-gcm -iv $nonce -key $key -encoding binary $paddedData]
 
 	#
 	# aes128gcm requires the header to be sent in the payload
 	#
 	set result {}
-	if {$encoding eq "aes128gcm"} {
+	if {$contentEncoding eq "aes128gcm"} {
 	    set result [createAes128gcmHeader $salt $ServerPubKey]
 	}
 	append result [dict get $cipher bytes][dict get $cipher tag]
@@ -464,24 +471,13 @@ namespace eval webpush {
 	    #
 	    # remove null bytes
 	    #
-	    # CHECK: why not using [string timleft $data "\x00"]
-	    #
-	    while {[string index $data 0] eq "\x00"} {
-		# remove first byte
-		set data [string range $data 1 end]
-	    }
-	    return $data
+	    return [string trimleft $data "\x00"]
 
 	} elseif {$encoding eq "aes128gcm"} {
 	    #
 	    # Null bytes at the end are padding.
 	    #
-	    # CHECK: why not using [string timright $data "\x00"]
-	    #
-	    while {[string index $data end] eq "\x00"} {
-		#remove last byte
-		set data [string range $data 0 end-1]
-	    }
+      set data [string trimright $data "\x00"]
 	    #
 	    # One delimiter bytes separates the data and the padding
 	    # remove this byte
@@ -490,7 +486,14 @@ namespace eval webpush {
 	}
     }
 
-    proc decrypt {encrData privKeyPem auth encoding {ServerPubKey ""} {salt ""}} {
+    nsf::proc decrypt {
+      -encrData
+      -privateKeyPem
+      -auth
+      -contentEncoding
+      {-serverPubKey ""}
+      {-salt ""}
+    } {
 	#
 	# Decrypt the encrypted data using a private key from a pem
 	# file, the server public key, the auth secret and a 16 byte
@@ -504,30 +507,30 @@ namespace eval webpush {
 	#
 	# @param return the encrypted message in binary format
 	#
-	if {$ServerPubKey eq "" || $salt eq ""} {
-	    if {$encoding ne "aes128gcm"} {
-		error "Server public key and salt required for $encoding encoding!"
+	if {$serverPubKey eq "" || $salt eq ""} {
+	    if {$contentEncoding ne "aes128gcm"} {
+		error "Server public key and salt required for $contentEncoding encoding!"
 	    }
 	    # get key and salt from header
 	    set keySalt [extractHeader $encrData]
-	    set ServerPubKey [lindex $keySalt 0]
+	    set serverPubKey [lindex $keySalt 0]
 	    set salt [lindex $keySalt 1]
 	    # remove header
 	    set headerlen [lindex $keySalt 2]
 	    set encrData [string range $encrData $headerlen end]
 	}
-	set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $ServerPubKey]
+	set sharedSecret [ns_crypto::eckey sharedsecret -pem $privateKeyPem -encoding binary $serverPubKey]
 
 	#
 	# make initial key material
 	#
-	set localPub [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
-	set ikm [makeIkm $auth $localPub $ServerPubKey $sharedSecret $encoding]
+	set localPub [ns_crypto::eckey pub -pem $privateKeyPem -encoding binary]
+	set ikm [makeIkm $auth $localPub $serverPubKey $sharedSecret $contentEncoding]
 
 	#
 	# create encryption key and nonce
 	#
-	set keyNonce [createEncryptionKeyNonce $localPub $ServerPubKey $ikm $salt $encoding]
+	set keyNonce [createEncryptionKeyNonce $localPub $serverPubKey $ikm $salt $contentEncoding]
 	set key [lindex $keyNonce 0]
 	set nonce [lindex $keyNonce 1]
 
@@ -539,20 +542,22 @@ namespace eval webpush {
 
 	set decrypted [ns_crypto::aead::decrypt string -cipher aes-128-gcm -iv $nonce -key $key -tag $tag -encoding binary $data]
 
-	return [unpad $decrypted $encoding]
+	return [unpad $decrypted $contentEncoding]
     }
 
-    proc dictToJson {dict} {
-	#
-	# Serializes a dict to JSON.  no testing for nested dicts or
-	# arrays, these will be simply added as a string the json is
-	# in compact form, meaning no whitespaces and newlines between
-	# keys/values.
+  proc dictToJson {dict} {
+  #
+  # Serializes a dict to JSON.  no testing for nested dicts or
+  # arrays, these will be simply added as a string the json is
+  # in compact form, meaning no whitespaces and newlines between
+  # keys/values.
 
-	set retJson "{"
-	dict for {key value} $dict {
-	    append retJson [subst {"$key":"$value",}]
-	}
-	return [string range $retJson 0 end-1]
+  set retJson "{"
+  dict for {key value} $dict {
+    append retJson [subst {"$key":"$value",}]
+  }
+  return "[string range $retJson 0 end-1]}"
     }
+
+
 }
