@@ -129,7 +129,8 @@ namespace eval webpush {
 	    #
 	    # encrypt the data
 	    #
-	    set encrData [encrypt -data $data \
+	    set encrData [encrypt \
+			      -data $data \
 			      -privateKeyPem $localPrivateKeyPem \
 			      -auth [ns_base64urldecode [dict get $subscription auth]] \
 			      -p256dh [ns_base64urldecode [dict get $subscription p256dh]] \
@@ -262,7 +263,7 @@ namespace eval webpush {
 	set signature [::ns_crypto::md vapidsign \
 			   -digest sha256 \
 			   -encoding base64url \
-			   -pem $private_key_pem \
+			   -pem $privateKeyPem \
 			   $JWTHeader.$JWTbody ]
 
 	return $JWTHeader.$JWTbody.$signature

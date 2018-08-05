@@ -62,7 +62,8 @@ pre {color: #e83e8c;}
     <p><pre>
     openssl ecparam \
         -name prime256v1 \
-        -genkey -noout \
+        -genkey \
+        -noout \
         -out MyPrivateKey.pem</pre></p>
     <p>Now we want to derive a public key:</p>
     <p><pre>
@@ -230,7 +231,7 @@ pre {color: #e83e8c;}
        -subscription /subscription/ \
        -data /data/ \
        -claim /claim/ \
-       -private_key_pem /private_key_pem/ \
+       -privateKeyPem /privateKeyPem/ \
        -localKeyPath /localKeyPath/ \
        ?-mode /mode/? \
        ?-timeout /timeout/?\
@@ -239,7 +240,7 @@ pre {color: #e83e8c;}
     <p>The <code>subscription</code> parameter is a dict that contains at least an “endpoint”. If you want to send push notifications with payload this dict also needs to contain an “auth” and a “p256dh” field. Note that this is not a nested dictionary as the standard JSON subscription object, i.e. no “keys” field is expected.<br>
     <code>data</code> contains the data you want to send as a payload. Make sure not to exceed that maximum payload size, otherwise an exception will be thrown.<br>
     <code>claim</code> is a dict containing at least a “sub” field. If “aud” and “exp” fields exist they will be validated, otherwise the will be extracted from the endpoint respectively set to a default.<br>
-    <code>private_key_pem</code> is the path to a pem file containing the private key you want to use for VAPID.<br>
+    <code>privateKeyPem</code> is the path to a pem file containing the private key you want to use for VAPID.<br>
     <code>localKeyPath</code> is a path to a directory with write access to create temporary keys for encryption.<br>
     <code>mode</code> GCM mode, can be set to “aesgcm” which is the default or “aes128gcm”.<br>
     <code>timeout</code> Is the timeout value for the post request in seconds.<br>
@@ -248,13 +249,15 @@ pre {color: #e83e8c;}
     <h3>Decryption</h3>
     <p>If you want to write your own client or want to use this encryption scheme for other purposes you can also use our API to decrypt messages using the following function:</p>
     <p><pre>
-    proc decrypt {
-        encrData privKeyPem ServerPubKey
-        auth salt mode} {
-       …
-    }
-    </pre>
-    <p>As input you need the encrypted data, the private key matching the public key that was used for encryption, i.e. the private key matching the public key in “p256dh” and the auth as well as the salt used for encryption. Currently supported GCM modes are “aesgcm” and “aes128gcm”.</p>
+    webpush::decrypt \
+      -encrData /encrData/ \
+      -privateKeyPem /privateKeyPem/ \
+      -auth /auth/ \
+      -mode /mode/ \
+      ?-serverPubKey /serverPubKey/? \
+      ?-salt /salt/? </pre>
+<p>As input you need the encrypted data, the private key matching the public key that was used for encryption, i.e. the private key matching the public key in “p256dh” and the auth as well as the salt used for encryption. Currently supported GCM modes are “aesgcm” and “aes128gcm”.</p>
+
     <h2>Conclusion</h2>
     <p>Hopefully we could shed some light on how the Web Push protocol as well as payload encryption works. Of course, one could simply use on of the available libraries and be done with it, however, it is often good to understand what is actually happening in order to evaluate all risks of a new technology appropriately. </p>
   </div>
