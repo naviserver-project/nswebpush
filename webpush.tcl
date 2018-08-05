@@ -11,7 +11,7 @@ namespace eval webpush {
 	-claim
 	-private_key_pem
 	-localKeyPath
-	{-encoding aesgcm}
+	{-mode aesgcm}
 	{-timeout 2.0}
 	{-ttl 0}
     } {
@@ -34,15 +34,15 @@ namespace eval webpush {
 	# @pram localKeyPath is a path to a directory with write
 	#       access to create temporary keys for encryption
 	#
-	# @param encoding can be either 'aesgcm' or 'aes128gcm'
+	# @param mode can be either 'aesgcm' or 'aes128gcm'
 	#
 	# @param timeout is the timeout parameter of the push message
 	#        (POST request)
 	#
 	# @param ttl is the time to live of the push message
 
-	if {$encoding ni {aesgcm aes128gcm}} {
-	    error "Unknown encoding"
+	if {$mode ni {aesgcm aes128gcm}} {
+	    error "Unknown GCM mode"
 	}
 	# validate subscription
 	if {[dict exists $subscription endpoint]} {
@@ -101,7 +101,7 @@ namespace eval webpush {
 	    # salt is needed for encryption.
 	    #
 	    set salt [ns_crypto::randombytes -encoding binary 16]
-	    if {$encoding eq "aesgcm"} {
+	    if {$mode eq "aesgcm"} {
 		#
 		# public key used for encryption needs to be appended
 		# to the crypt-key header.  The keyid field links the
@@ -123,7 +123,7 @@ namespace eval webpush {
 	    #
 	    # Set content-encoding and content-type headers.
 	    #
-	    ns_set update $headers "content-encoding" $encoding
+	    ns_set update $headers "content-encoding" $mode
 	    ns_set update $headers "content-type" application/octet-stream
 
 	    #
@@ -134,7 +134,7 @@ namespace eval webpush {
 			      [ns_base64urldecode [dict get $subscription auth]] \
 			      [ns_base64urldecode [dict get $subscription p256dh]] \
 			      $salt \
-			      $encoding]
+			      $mode]
 	    #
 	    # content-length header is the length of the encrypted data in bytes
 	    #
@@ -259,8 +259,11 @@ namespace eval webpush {
 	# reformat claim dict to json
 	set JWTbody [ns_base64urlencode [dictToJson $claim]]
 
-	set signature [::ns_crypto::md vapidsign -digest sha256\
-			   -encoding base64url -pem $private_key_pem $JWTHeader.$JWTbody ]
+	set signature [::ns_crypto::md vapidsign \
+			   -digest sha256 \
+			   -encoding base64url \
+			   -pem $private_key_pem \
+			   $JWTHeader.$JWTbody ]
 	return $JWTHeader.$JWTbody.$signature
     }
 
@@ -288,15 +291,15 @@ namespace eval webpush {
     }
 
 
-    proc createEncryptionKeyNonce {clientPubKey serverPubKey ikm salt encoding} {
+    proc createEncryptionKeyNonce {clientPubKey serverPubKey ikm salt mode} {
 	#
 	# Derive key and nonce from client public key, server public
 	# key, initial key material and salt input parameters (except
-	# encoding which can be 'aesgcm' or 'aes128gcm') are expected
+	# mode which can be 'aesgcm' or 'aes128gcm') are expected
 	# in binary encoding returns the encryption key and nonce in
 	# binary for webpush as a list (first element key, 2nd nonce)
 
-	if {$encoding eq "aes128gcm"} {
+	if {$mode eq "aes128gcm"} {
 	    set keyInfo [binary format A*x "Content-Encoding: aes128gcm"]
 	    set nonceInfo [binary format A*x "Content-Encoding: nonce"]
 	} else {
@@ -311,12 +314,12 @@ namespace eval webpush {
     }
 
 
-    proc makeIkm {auth p256dh ServerPubKey sharedSecret encoding} {
+    proc makeIkm {auth p256dh ServerPubKey sharedSecret mode} {
 	#
-	# Create the initial key material for webpush the specified
-	# encoding.
+	# Create the initial key material for Web Push the specified
+	# mode.
 	#
-	if {$encoding eq "aes128gcm"} {
+	if {$mode eq "aes128gcm"} {
 	    set authInfo [binary format A*x "WebPush: info"]
 	    append authInfo $p256dh
 	    append authInfo $ServerPubKey
@@ -331,13 +334,13 @@ namespace eval webpush {
 		    32]
     }
 
-    proc padData {encoding data} {
+    proc padData {mode data} {
 	#
-	# Fill the data with maximum padding according to the encoding
+	# Fill the data with maximum padding according to the mode
 	# returns the padded data.
 	#
 
-	if {$encoding eq "aesgcm"} {
+	if {$mode eq "aesgcm"} {
 	    #
 	    # maximum size for aesgcm is 4078
 	    #
@@ -350,7 +353,7 @@ namespace eval webpush {
 	    set padding [binary format Sx$paddingLength $paddingLength]
 	    return $padding$data
 
-	} elseif {$encoding eq "aes128gcm"} {
+	} elseif {$mode eq "aes128gcm"} {
 	    #
 	    # set maximum padding length: maximum lengt(4096 - 86 for
 	    # header) - 16 for the cipher tag - 1 for the delimiter
@@ -362,7 +365,7 @@ namespace eval webpush {
 	    return $data$padding
 
 	} else {
-	    error "Unknown encoding $encoding. Only aesgcm and aes128gcm supported"
+	    error "Unknown GCM mode $mode. Only aesgcm and aes128gcm are supported"
 	}
     }
 
@@ -381,14 +384,14 @@ namespace eval webpush {
 	return $result
     }
 
-    proc encrypt {data privKeyPem auth p256dh salt encoding} {
+    proc encrypt {data privKeyPem auth p256dh salt mode} {
 	#
 	# Encrypt the data using a private key from a pem file, the
 	# auth and p256dh fields of a subscription and a 16 byte
 	# random salt value.
 	#
 	# @param privKeyPem is the path to an EC private key pem file
-	# @param encoding can be 'aesgcm' or 'aes128gcm'
+	# @param mode can be 'aesgcm' or 'aes128gcm'
 	#
 	# other parameters are expected in binary format.
 	#
@@ -403,26 +406,26 @@ namespace eval webpush {
 	#
 	# Make initial key material.
 	#
-	set ikm [makeIkm $auth $p256dh $ServerPubKey $sharedSecret $encoding]
+	set ikm [makeIkm $auth $p256dh $ServerPubKey $sharedSecret $mode]
 
 	#
 	# Create encryption key and nonce
 	#
-	set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt $encoding]
+	set keyNonce [createEncryptionKeyNonce $p256dh $ServerPubKey $ikm $salt $mode]
 	set key [lindex $keyNonce 0]
 	set nonce [lindex $keyNonce 1]
 
 	#
 	# Do encryption:
 	#
-	set paddedData [padData $encoding $data]
+	set paddedData [padData $mode $data]
 	set cipher [::ns_crypto::aead::encrypt string -cipher aes-128-gcm -iv $nonce -key $key -encoding binary $paddedData]
 
 	#
 	# aes128gcm requires the header to be sent in the payload
 	#
 	set result {}
-	if {$encoding eq "aes128gcm"} {
+	if {$mode eq "aes128gcm"} {
 	    set result [createAes128gcmHeader $salt $ServerPubKey]
 	}
 	append result [dict get $cipher bytes][dict get $cipher tag]
@@ -449,11 +452,11 @@ namespace eval webpush {
 	return [list $key $salt $headerlen]
     }
 
-    proc unpad {data encoding} {
+    proc unpad {data mode} {
 	#
-	# Unpad data according to the encoding.
+	# Unpad data according to the mode.
 	#
-	if {$encoding eq "aesgcm"} {
+	if {$mode eq "aesgcm"} {
 	    #
 	    # Padding consists of leading null bytes followed by two
 	    # bytes that indicate the size of the padding.
@@ -472,7 +475,7 @@ namespace eval webpush {
 	    }
 	    return $data
 
-	} elseif {$encoding eq "aes128gcm"} {
+	} elseif {$mode eq "aes128gcm"} {
 	    #
 	    # Null bytes at the end are padding.
 	    #
@@ -490,7 +493,7 @@ namespace eval webpush {
 	}
     }
 
-    proc decrypt {encrData privKeyPem auth encoding {ServerPubKey ""} {salt ""}} {
+    proc decrypt {encrData privKeyPem auth mode {ServerPubKey ""} {salt ""}} {
 	#
 	# Decrypt the encrypted data using a private key from a pem
 	# file, the server public key, the auth secret and a 16 byte
@@ -499,14 +502,15 @@ namespace eval webpush {
 	# used for encryption (p256dh field in the subscription info
 	# is the public key). The public key of server and salt can be
 	# derived from the ciphertext (encrData) in aes128gcm.
-	# encoding can be 'aesgcm' or 'aes128gcm' other parameters
-	# (including data) are expected in binary format
+	#
+	# @param mode can be 'aesgcm' or 'aes128gcm'
+	# other parameters (including data) are expected in binary format
 	#
 	# @param return the encrypted message in binary format
 	#
 	if {$ServerPubKey eq "" || $salt eq ""} {
-	    if {$encoding ne "aes128gcm"} {
-		error "Server public key and salt required for $encoding encoding!"
+	    if {$mode ne "aes128gcm"} {
+		error "Server public key and salt required for $mode GCM mode!"
 	    }
 	    # get key and salt from header
 	    set keySalt [extractHeader $encrData]
@@ -516,18 +520,21 @@ namespace eval webpush {
 	    set headerlen [lindex $keySalt 2]
 	    set encrData [string range $encrData $headerlen end]
 	}
-	set sharedSecret [ns_crypto::eckey sharedsecret -pem $privKeyPem -encoding binary $ServerPubKey]
+	set sharedSecret [ns_crypto::eckey sharedsecret \
+			      -pem $privKeyPem \
+			      -encoding binary \
+			      $ServerPubKey]
 
 	#
 	# make initial key material
 	#
 	set localPub [ns_crypto::eckey pub -pem $privKeyPem -encoding binary]
-	set ikm [makeIkm $auth $localPub $ServerPubKey $sharedSecret $encoding]
+	set ikm [makeIkm $auth $localPub $ServerPubKey $sharedSecret $mode]
 
 	#
 	# create encryption key and nonce
 	#
-	set keyNonce [createEncryptionKeyNonce $localPub $ServerPubKey $ikm $salt $encoding]
+	set keyNonce [createEncryptionKeyNonce $localPub $ServerPubKey $ikm $salt $mode]
 	set key [lindex $keyNonce 0]
 	set nonce [lindex $keyNonce 1]
 
@@ -537,9 +544,15 @@ namespace eval webpush {
 	set tag [string range $encrData end-15 end]
 	set data [string range $encrData 0 end-16]
 
-	set decrypted [ns_crypto::aead::decrypt string -cipher aes-128-gcm -iv $nonce -key $key -tag $tag -encoding binary $data]
+	set decrypted [ns_crypto::aead::decrypt string \
+			   -cipher aes-128-gcm \
+			   -iv $nonce \
+			   -key $key \
+			   -tag $tag \
+			   -encoding binary \
+			   $data]
 
-	return [unpad $decrypted $encoding]
+	return [unpad $decrypted $mode]
     }
 
     proc dictToJson {dict} {

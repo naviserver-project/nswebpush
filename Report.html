@@ -120,7 +120,7 @@ pre {color: #e83e8c;}
     <li>Generate a new set of keys for each message.</li>
     <li>Derive a shared secret using the Diffie-Hellman-algorithm and compute encryption parameters</li>
     <li>Encrypt the payload </li>
-    <li>Format a post request according to a given encoding scheme (we will cover aesgcm and the newer aes128gcm)</li>
+    <li>Format a post request according to a given mode (we cover "aesgcm" and the newer "aes128gcm")</li>
     </ol>
     <p>For every data bearing push message it is necessary to generate a new pair of keys. We do this the same way we did for VAPID:</p>
     <p><pre>
@@ -147,9 +147,9 @@ pre {color: #e83e8c;}
         -encoding binary \
         32</pre></p>
     <p>Salt is a random value that adds cryptographic strength to the output. The secret parameter contains the input key material. Info is optional and contains application specific information. HKDF can create outputs of arbitrary length up to 255 times as long as the hash used (SHA-256 for Web Push). It is specified as 32 in the above example.<br>
-    How exactly the input key material and infostring are created and HKDF is used varies between the encoding schemes which is why we are going to look at them separately.</p>
+    How exactly the input key material and infostring are created and HKDF is used varies between the GCM modes which is why we are going to look at them separately.</p>
     <h3>Encryption parameters in aesgcm</h3>
-    <p>At the time of writing, <a href=https://tools.ietf.org/id/draft-ietf-webpush-encryption-04.html>aesgcm</a> is the most common encoding scheme for Web Push. The first step is to create the input key material (ikm). This is the first use of the HKDF function. The parameters for it must be set as follows:</p>
+    <p>At the time of writing, <a href=https://tools.ietf.org/id/draft-ietf-webpush-encryption-04.html>aesgcm</a> is the most common GCM mode for Web Push. The first step is to create the input key material (ikm). This is the first use of the HKDF function. The parameters for it must be set as follows:</p>
     <ul>
     <li><em>salt</em>: The “auth” field of the subscription is used here. Note that <code>ns_crypto::md hkdf</code> expects this parameter in binary format.</li>
     <li><em>secret</em>: The shared secret derived from the client public key (“p256dh” of subscription) and our temporary private key again in binary format</li>
@@ -212,7 +212,7 @@ pre {color: #e83e8c;}
     <p>mySalt is the salt we used in the encryption process. tempPubKey is the public key of the keypair we created for this one message. Both parameters need to be encoded in base64url format. Since we send the data in raw binary we set the content-type to application/octet-stream. The body of the post request contains our encrypted data (ciphertext plus authentication tag).<br>
     To identify yourself you also need to add the authorization header containing your VAPID details. As in requests without payload the TTL header needs to be set as well.</p>
     <h3>Encryption parameters in aes128gcm</h3>
-    <p><a href=https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-09>Aes128gcm</a> is the newest encoding that is used for Web Push. It came out in 2017 so some push services might not support it yet (Chrome and Firefox do). We will only highlight the differences to aesgcm:</p>
+    <p><a href=https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-09>Aes128gcm</a> is the newest GCM mode that is used for Web Push. It came out in 2017 so some push services might not support it yet (Chrome and Firefox do). We will only highlight the differences to aesgcm:</p>
     <ul>
     <li><p>The infostring for the initial HKDF call that creates the initial key material differs from aesgcm. In aesgcm this string was “Content-Encoding: auth\x00”. For aes128gcm this string also contains the client and server public keys in binary format. It is constructed as follows:</p>
     <p>“WebPush: info” followed by a null byte followed by the client public key (“p256dh”) in binary format followed by the temporary server public key in binary format.</p></li>
@@ -232,7 +232,7 @@ pre {color: #e83e8c;}
        -claim /claim/ \
        -private_key_pem /private_key_pem/ \
        -localKeyPath /localKeyPath/ \
-       ?-encoding /encoding/? \
+       ?-mode /mode/? \
        ?-timeout /timeout/?\
        ?-ttl /ttl/?</pre></p>
     
@@ -241,7 +241,7 @@ pre {color: #e83e8c;}
     <code>claim</code> is a dict containing at least a “sub” field. If “aud” and “exp” fields exist they will be validated, otherwise the will be extracted from the endpoint respectively set to a default.<br>
     <code>private_key_pem</code> is the path to a pem file containing the private key you want to use for VAPID.<br>
     <code>localKeyPath</code> is a path to a directory with write access to create temporary keys for encryption.<br>
-    <code>encoding</code> can be set to “aesgcm” which is the default or “aes128gcm”.<br>
+    <code>mode</code> GCM mode, can be set to “aesgcm” which is the default or “aes128gcm”.<br>
     <code>timeout</code> Is the timeout value for the post request in seconds.<br>
     <code>ttl</code> is the time to live in seconds for the push message.<br>
     And that is all you need to do to successfully send a push message to a client. Of course, the public key the client subscribed to must match the private key used here.</p>
@@ -250,11 +250,11 @@ pre {color: #e83e8c;}
     <p><pre>
     proc decrypt {
         encrData privKeyPem ServerPubKey
-        auth salt encoding} {
+        auth salt mode} {
        …
     }
     </pre>
-    <p>As input you need the encrypted data, the private key matching the public key that was used for encryption, i.e. the private key matching the public key in “p256dh” and the auth as well as the salt used for encryption. Currently supported encodings are “aesgcm” and “aes128gcm”.</p>
+    <p>As input you need the encrypted data, the private key matching the public key that was used for encryption, i.e. the private key matching the public key in “p256dh” and the auth as well as the salt used for encryption. Currently supported GCM modes are “aesgcm” and “aes128gcm”.</p>
     <h2>Conclusion</h2>
     <p>Hopefully we could shed some light on how the Web Push protocol as well as payload encryption works. Of course, one could simply use on of the available libraries and be done with it, however, it is often good to understand what is actually happening in order to evaluate all risks of a new technology appropriately. </p>
   </div>
