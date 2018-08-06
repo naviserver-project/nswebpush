@@ -7,7 +7,13 @@ source $scriptDir/webpush.tcl
 ns_log notice "script $scriptDir/webpush.tcl was loaded"
 # source [ns_info home]/pages/pushnotificationsapi/webpush.tcl
 
-set ::vapidCertPath "[ns_info home]/modules/vapid"
+#set ::vapidCertPath "[ns_info home]/modules/vapid"
+
+#
+# Set everything to the $scriptdir containing the matching certificate
+# of the test cases. Should be probably changed later.
+#
+set ::vapidCertPath $scriptDir
 
 namespace eval webpush {
     namespace import ::tcltest::*
