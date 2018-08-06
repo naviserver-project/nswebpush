@@ -470,6 +470,11 @@ namespace eval webpush {
 	    # Padding consists of leading null bytes followed by two
 	    # bytes that indicate the size of the padding.
 	    #
+	    # CHECK: bei diesem unpadden können potentiell auch nullen
+	    # gelöscht werden, die nicht Bestandteil des paddings
+	    # sind. Richtig wäre: umwandeln der letzten beiden bytes
+	    # in die Länge (n), dann Löschen der letzten n Bytes.
+	    #
 	    # Remove the 2 bytes of padding length.
 	    #
 	    set data [string range $data 2 end]
