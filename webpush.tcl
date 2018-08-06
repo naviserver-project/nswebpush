@@ -357,9 +357,9 @@ namespace eval webpush {
 
 	} elseif {$mode eq "aes128gcm"} {
 	    #
-	    # set maximum padding length: maximum lengt(4096 - 86 for
+	    # Set maximum padding length: maximum lengt(4096 - 86 for
 	    # header) - 16 for the cipher tag - 1 for the delimiter
-	    # byte
+	    # byte.
 	    #
 	    set paddingLength [expr {4010 - 16 - 1 - [string bytelength $data]}]
 	    set padding \x02
@@ -470,19 +470,19 @@ namespace eval webpush {
 	    # Padding consists of leading null bytes followed by two
 	    # bytes that indicate the size of the padding.
 	    #
-	    # Remove the 2 bytes of padding length
+	    # Remove the 2 bytes of padding length.
 	    #
 	    set data [string range $data 2 end]
 	    #
-	    # remove null bytes
+	    # Remove null bytes (padding) from the left.
 	    #
 	    return [string trimleft $data "\x00"]
 
 	} elseif {$mode eq "aes128gcm"} {
 	    #
-	    # Null bytes at the end are padding.
+	    # Remove Null bytes at the end are padding.
 	    #
-      set data [string trimright $data "\x00"]
+	    set data [string trimright $data "\x00"]
 	    #
 	    # One delimiter bytes separates the data and the padding
 	    # remove this byte
