@@ -14,6 +14,12 @@ ns_log notice "script $scriptDir/webpush.tcl was loaded"
 # of the test cases. Should be probably changed later.
 #
 set ::vapidCertPath $scriptDir
+#
+# This is the endpoint this script sends 3 notifications to for testing
+#
+set ::testEndpoint {
+    {"endpoint":"https://fcm.googleapis.com/fcm/send/d9IxzALjkyU:APA91bFkfLpZ4H8TEaCel9OtfL0V1LCSOGg253Cb0829sSwfo2CcKt_neqG5mZy8fhhRoeYyj-3Ds8i3edWn06snJxOULw68QV0RQe6yOgJ7vF70LWvzVi2QP1ZxtBLwLLkbbfI62Yuj","expirationTime":null,"keys":{"p256dh":"BG8SsZZCcU-hqyygt5d3Ov39GEyFM6wixAJqz37KBdEibeSKwJZz_T3li6B1aktuYDMOA0fEqIhzzMLqGfQ3gNU","auth":"8O1T8AvRJcqA8UB3vMVCoA"}}
+}
 
 namespace eval webpush {
     namespace import ::tcltest::*
@@ -161,9 +167,7 @@ namespace eval webpush {
 
 
     test webpush-send-1.2 {send successfully} -body {
-	set epDict [::json::json2dict {
-	    {"endpoint":"https://fcm.googleapis.com/fcm/send/d9IxzALjkyU:APA91bFkfLpZ4H8TEaCel9OtfL0V1LCSOGg253Cb0829sSwfo2CcKt_neqG5mZy8fhhRoeYyj-3Ds8i3edWn06snJxOULw68QV0RQe6yOgJ7vF70LWvzVi2QP1ZxtBLwLLkbbfI62Yuj","expirationTime":null,"keys":{"p256dh":"BG8SsZZCcU-hqyygt5d3Ov39GEyFM6wixAJqz37KBdEibeSKwJZz_T3li6B1aktuYDMOA0fEqIhzzMLqGfQ3gNU","auth":"8O1T8AvRJcqA8UB3vMVCoA"}}
-	}]
+	set epDict [::json::json2dict $::testEndpoint]
 	set keys [dict get $epDict keys]
 	set validEndpoint [subst {endpoint [dict get $epDict endpoint] auth [dict get $keys auth] p256dh [dict get $keys p256dh]}]
 	set validClaim {sub mailto:georg@test.com}
