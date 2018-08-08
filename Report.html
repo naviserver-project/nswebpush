@@ -241,7 +241,7 @@ pre {color: #e83e8c;}
        ?-mode /mode/? \
        ?-timeout /timeout/?\
        ?-ttl /ttl/?</pre></p>
-    
+
     <p>The <code>subscription</code> parameter is a dict that contains at least an “endpoint”. If you want to send push notifications with payload this dict also needs to contain an “auth” and a “p256dh” field. Note that this is not a nested dictionary as the standard JSON subscription object, i.e. no “keys” field is expected.<br>
     <code>data</code> contains the data you want to send as a payload. Make sure not to exceed that maximum payload size, otherwise an exception will be thrown.<br>
     <code>claim</code> is a dict containing at least a “sub” field. If “aud” and “exp” fields exist they will be validated, otherwise the will be extracted from the endpoint respectively set to a default.<br>
@@ -251,6 +251,17 @@ pre {color: #e83e8c;}
     <code>timeout</code> Is the timeout value for the post request in seconds.<br>
     <code>ttl</code> is the time to live in seconds for the push message.<br>
     And that is all you need to do to successfully send a push message to a client. Of course, the public key the client subscribed to must match the private key used here.</p>
+    <h3>Encryption</h3>
+    In case you want to assemble your post requests yourself you can just use our API for encrypting your data. This is done using the following function:
+    <p><pre>
+    webpush::encrypt \
+      -data /data/ \
+      -privateKeyPem /privateKeyPem/ \
+      -auth /auth/ \
+      -p256dh /p256dh/ \
+      -salt /salt/ \
+      -mode /mode/</pre></p>
+    This function encrypts the data using a private key in form of a pem file, the auth secret, the client public key (<code>p256dh</code>) and a salt value. <code>auth, p256dh, salt</code> are expected in binary format. Currently "aesgcm" and "aes128gcm" are supportet content encryption modes. The encrypted data is returned in binary format.
     <h3>Decryption</h3>
     <p>If you want to write your own client or want to use this encryption scheme for other purposes you can also use our API to decrypt messages using the following function:</p>
     <p><pre>
