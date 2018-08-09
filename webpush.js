@@ -23,7 +23,7 @@
 
 const applicationServerPublicKey = 'BFzhXP5G5Pp5xmEfESPsd7L6N2oQZZypGd2tUR5diW9spzJFs5DXaUuM1iMVfZGunUhtHkyYjqPfcQ2bfzKzbeY';
 
-const pushButton = document.querySelector('.js-push-btn');
+  const pushButton = document.querySelector('.js-push-btn');
 
 let isSubscribed = false;
 let swRegistration = null;
@@ -65,7 +65,7 @@ function initializeUI() {
   pushButton.addEventListener('click', function() {
     pushButton.disabled = true;
     if (isSubscribed) {
-      // TODO: Unsubscribe user
+      unsubscribeUser();
     } else {
       subscribeUser();
     }
@@ -109,6 +109,26 @@ function subscribeUser() {
   });
 }
 
+function unsubscribeUser() {
+  swRegistration.pushManager.getSubscription()
+  .then(function(subscription) {
+    if (subscription) {
+      return subscription.unsubscribe();
+    }
+  })
+  .catch(function(error) {
+    console.log('Error unsubscribing', error);
+  })
+  .then(function() {
+    updateSubscriptionOnServer(null);
+
+    console.log('User is unsubscribed.');
+    isSubscribed = false;
+
+    updateBtn();
+  });
+}
+
 function updateSubscriptionOnServer(subscription) {
   // TODO: Send subscription to application server
 
@@ -126,11 +146,11 @@ function updateSubscriptionOnServer(subscription) {
 
 function updateBtn() {
   if (isSubscribed) {
-      pushButton.textContent = 'Already Subscribed';
-      pushButton.disabled = true;
+    pushButton.textContent = 'Disable Push Messaging';
   } else {
-      pushButton.textContent = 'Create Subscription';
-      pushButton.disabled = false;
+    pushButton.textContent = 'Enable Push Messaging';
   }
+
+  pushButton.disabled = false;
 
 }
