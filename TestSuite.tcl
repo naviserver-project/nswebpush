@@ -212,9 +212,9 @@ namespace eval webpush {
     # PEM tests
     ##########################################################################
 
-    test pem-1.0 {createPrivateKeyPem} -body {
-	createPrivateKeyPem $::vapidCertPath/localpriv.pem
-	if {[file exists $::vapidCertPath/localpriv.pem]} {
+    test pem-1.0 {createTmpPrivateKeyPem} -body {
+	set pemFile [createTmpPrivateKeyPem]
+	if {[file exists $pemFile]} {
 	    set result 1
 	}
     } -result {1}
@@ -223,8 +223,11 @@ namespace eval webpush {
     # input/output for encryption functions from node.js crypto library
     # see "test.js"
     test generateInfo-1.0 {} -body {
-	set result [string map {"\n" {}} [ns_base64encode \
-					      [generateInfo aesgcm [ns_base64urldecode BJkXi48PlCiNCs9dLggxXQ39bdi64agt_emycss5gsg5BYqOWwP5gnbmga7Rg1_tKvnu0c3InK0C850s1czzyBg] [ns_base64urldecode BJZRgas6kMag9rP2X5oVVhGzPwwT24p103WKkPlB7jFTmYVA3QsuLBaSSxNO-UVU-0SjHo0uIsiNoFQRYLDt7cE]]]]
+	set result [generateInfo aesgcm \
+			[ns_base64urldecode BJkXi48PlCiNCs9dLggxXQ39bdi64agt_emycss5gsg5BYqOWwP5gnbmga7Rg1_tKvnu0c3InK0C850s1czzyBg] \
+			[ns_base64urldecode BJZRgas6kMag9rP2X5oVVhGzPwwT24p103WKkPlB7jFTmYVA3QsuLBaSSxNO-UVU-0SjHo0uIsiNoFQRYLDt7cE]]
+	set result [string map {"\n" {}} [ns_base64encode $result]]
+
     } -result {Q29udGVudC1FbmNvZGluZzogYWVzZ2NtAFAtMjU2AABBBJkXi48PlCiNCs9dLggxXQ39bdi64agt/emycss5gsg5BYqOWwP5gnbmga7Rg1/tKvnu0c3InK0C850s1czzyBgAQQSWUYGrOpDGoPaz9l+aFVYRsz8ME9uKddN1ipD5Qe4xU5mFQN0LLiwWkksTTvlFVPtEox6NLiLIjaBUEWCw7e3B}
 
 
@@ -283,8 +286,8 @@ namespace eval webpush {
 
     test decrypt-1.0 {decryptAesgcm} -body {
 	# this is the client keypair
-	set localPriv [createPrivateKeyPem $::vapidCertPath/localpriv.pem]
-	set localPub [ns_crypto::eckey pub -pem $::vapidCertPath/localpriv.pem -encoding binary]
+	set localPriv [createTmpPrivateKeyPem]
+	set localPub [ns_crypto::eckey pub -pem $localPriv -encoding binary]
 	# client public key i ś the p256dh field in a subscription
 	set encrypted [encrypt -data "Encryptiontest" \
 			   -privateKeyPem $::vapidCertPath/prime256v1_key.pem \
@@ -296,17 +299,19 @@ namespace eval webpush {
 	set ServerPubKey [ns_crypto::eckey pub -pem $::vapidCertPath/prime256v1_key.pem -encoding binary]
 
 	decrypt -encrData $encrypted \
-	    -privateKeyPem $::vapidCertPath/localpriv.pem \
+	    -privateKeyPem $localPriv \
 	    -auth [ns_base64urldecode 4LLU4S9l1S9IrPTsQZkPqw] \
 	    -mode aesgcm \
 	    -serverPubKey $ServerPubKey \
 	    -salt [ns_base64decode WVGtEt/7tGKMNgqAeDvEPA==]
+    } -cleanup {
+	file delete $localPriv
     } -result {Encryptiontest}
 
     test decrypt-1.1  {decryptAes128gcm} -body {
 	# this is the client keypair
-	set localPriv [createPrivateKeyPem $::vapidCertPath/localpriv.pem]
-	set localPub [ns_crypto::eckey pub -pem $::vapidCertPath/localpriv.pem -encoding binary]
+	set localPriv [createTmpPrivateKeyPem]
+	set localPub [ns_crypto::eckey pub -pem $localPriv -encoding binary]
 	# client public key i ś the p256dh field in a subscription
 	set encrypted [encrypt -data "Encryptiontest" \
 			   -privateKeyPem $::vapidCertPath/prime256v1_key.pem \
@@ -316,9 +321,11 @@ namespace eval webpush {
 			   -mode aes128gcm]
 
 	decrypt -encrData $encrypted \
-	    -privateKeyPem $::vapidCertPath/localpriv.pem \
+	    -privateKeyPem $localPriv \
 	    -auth [ns_base64urldecode 4LLU4S9l1S9IrPTsQZkPqw] \
 	    -mode aes128gcm
+    } -cleanup {
+	file delete $localPriv
     } -result {Encryptiontest}
 
     cleanupTests
