@@ -142,6 +142,11 @@ namespace eval webpush {
                               -salt $salt \
                               -mode $mode]
             #
+            # The temporary local private key is used only once for a single push message.
+            # Hence it can be deleted here
+            #
+            file delete $localPrivateKeyPem
+            #
             # content-length header is the length of the encrypted data in bytes
             #
             ns_set update $headers "content-length" [string length $encrData]
@@ -154,12 +159,6 @@ namespace eval webpush {
                          -timeout $timeout \
                          -body $encrData \
                          $endpoint]
-            #
-            # CHECK: Does the RFC require to create a new pemfile for every encryption?
-            #        if i see correctly, https://tools.ietf.org/html/rfc8291 3.1 says so.
-            #        if yes, then it is safe to delete $localPrivateKeyPem here (or
-            #        after encrypt).
-            #
         } else {
             ns_set update $headers "content-type" "application/octet-stream"
             #
