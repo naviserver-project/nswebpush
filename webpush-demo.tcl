@@ -161,6 +161,8 @@ ns_return 200 text/html [subst {
     <p>$pushstatus</p>
     </div>
     </div>
+    <p>For the technical details behind this demo,
+    see <a href="Report.html">Implementing Web Push with NaviServer</a>.
     </section>
     
     </main>
