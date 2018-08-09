@@ -100,13 +100,13 @@ ns_return 200 text/html [subst {
     application server.  We use in this demo
     <strong>OpenACS.org</strong> as an application server for testing
     purposes.
-    
+
     <p>This service depends on The Google/Mozilla Web Push services
     amd was tested with recent versions of Firefox and Chrome on
     Windows, Linux, macOS and Android (currently just Chrome).  It
     does not work with Safari or on any browser in iOS due to limited
     support on these Browsers.
-    
+
     </div>
     <div class="mdl-cell mdl-cell--6-col">
     <p>The application server is identified over its public key, which
@@ -118,13 +118,13 @@ ns_return 200 text/html [subst {
         Subscribe
       </button>
     </p>
-    
+
     </div>
     <div class="mdl-cell mdl-cell--6-col">
     <img src="webpush-subscribe.png" width="320">
     </div>
     </div>
-    
+
     <section class="subscription-details js-subscription-details is-invisible">
 
     <div class="mdl-grid">
@@ -132,8 +132,7 @@ ns_return 200 text/html [subst {
     <p>Once you've subscribed your user, your subscription is
     typically sent to the server and saved there in a database such
     that the server can send you a message via this subscription.
-    The subscription is not saved for this demo. Unsubscription works currently via
-    Server configuration (llok for the "Service Worker" configuration).
+    The subscription is not saved for this demo. 
     </div>
     <div class="mdl-cell mdl-cell--6-col">
     <p>The application server can now send an encrypted message to the
@@ -164,12 +163,12 @@ ns_return 200 text/html [subst {
     <p>For the technical details behind this demo,
     see <a href="Report.html">Implementing Web Push with NaviServer</a>.
     </section>
-    
+
     </main>
 
   <script src="webpush.js"></script>
 
-  <script src="https://code.getmdl.io/1.2.1/material.min.js"></script>    
+  <script src="https://code.getmdl.io/1.2.1/material.min.js"></script>
 
   </html>
 
