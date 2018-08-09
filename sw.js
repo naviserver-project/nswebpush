@@ -23,12 +23,12 @@
 
 self.addEventListener('push', function(event) {
   console.log('[Service Worker] Push Received.');
-  var notifText = 'Yay it works!';
+  var notifText = 'NaviServer rocks!';
   if (event.data) {
     notifText = event.data.text();
   }
 
-  const title = 'Push Codelab';
+  const title = 'NaviServer Push Demo';
   const options = {
     body: notifText,
     icon: 'images/icon.png',
