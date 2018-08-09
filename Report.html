@@ -13,13 +13,15 @@
 <style>
 pre {color: #e83e8c;}
 </style>
-    <title>Realising Web Push with NaviServer</title>
+    <title>Implementeing Web Push with NaviServer</title>
   </head>
   <body>
   <div class="container">
       <div class="jumbotron">
-      <h1 class="display-4">Realising Web Push with NaviServer</h1>
-      <p class="lead">This article gives an overview over the Web Push protocol, VAPID and payload encryption. Additionally, we present a Tcl API that uses NaviServer's cryptographic functionality to implement Web Push.</p>
+      <h1 class="display-4">Implementeing Web Push with NaviServer</h1>
+	<p class="lead">This article gives an overview over the Web Push protocol, VAPID and payload encryption.
+	Additionally, we present a Tcl API that based on NaviServer's cryptographic primitives to implement Web Push
+	supporting both "aesgcm" and "aes128gcm". To use ist, please get anthe most recent version of NaviServer and OpenSSL.</p>
       </div>
   </div>
   <div class="container" style="max-width: 50%;">
@@ -217,8 +219,9 @@ pre {color: #e83e8c;}
     </ul>
     <p>mySalt is the salt we used in the encryption process. tempPubKey is the public key of the keypair we created for this one message. Both parameters need to be encoded in base64url format. Since we send the data in raw binary we set the content-type to application/octet-stream. The body of the post request contains our encrypted data (ciphertext plus authentication tag).<br>
     To identify yourself you also need to add the authorization header containing your VAPID details. As in requests without payload the TTL header needs to be set as well.</p>
+    
     <h3>Encryption parameters in aes128gcm</h3>
-    <p><a href=https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-09>Aes128gcm</a> is the newest GCM mode that is used for Web Push. It came out in 2017 so some push services might not support it yet (Chrome and Firefox do). We will only highlight the differences to aesgcm:</p>
+    <p><a href=https://tools.ietf.org/html/draft-ietf-httpbis-encryption-encoding-09>Aes128gcm</a> is the newest GCM mode that is used for Web Push. It is as well the standard proposed by <a href="https://tools.ietf.org/html/rfc8188">RFC 8188</a> (Encrypted Content-Encoding for HTTP). This standard was published in 2017, so some push services might not support it yet (most prominently, current versions of Chrome and Firefox support it). We will only highlight the differences to aesgcm:</p>
     <ul>
     <li><p>The infostring for the initial HKDF call that creates the initial key material differs from aesgcm. In aesgcm this string was “Content-Encoding: auth\x00”. For aes128gcm this string also contains the client and server public keys in binary format. It is constructed as follows:</p>
     <p>“WebPush: info” followed by a null byte followed by the client public key (“p256dh”) in binary format followed by the temporary server public key in binary format.</p></li>
@@ -228,7 +231,8 @@ pre {color: #e83e8c;}
     <p>salt (16bytes) | rs (4 bytes) | pubKeyLen (1 byte) | pubKey (65 bytes)</p>
     The record size (rs) is a 32-bit big endian integer. The final payload must be less than this number of bytes. It is allowed to simply set this to the maximum payload size of 4096. Next is the length of key that follows as 8-bit integer. Since the length of public keys for Web Push is 65 this will always be the number 65 encoded in 8 bits. The last part is the temporary public key that was created for this push message. These 86 bytes need to be the first bytes in the payload of an aes128gcm request. Hence, the final form of the body should look like this:  aes128gcmheader | ciphertext | authenticationtag</li>
     <li>Encryption and crypto-key headers are not used for aes128gcm since this information is stored in the body of the request.</li>
-    </ul>
+  </ul>
+  
     <h2>Tcl API for Web Push and NaviServer</h2>
     <p>We created a simple to use <a href=https://bitbucket.org/Gepro83/pushnotificationsapi/src/master/vapid.tcl>Tcl API</a> that builds on NaviServer which handles all of the VAPID and encryption details for you. As a user of this API all you need to do is call a single function to send a push notification to a client:</p>
     <p><pre>
@@ -251,8 +255,9 @@ pre {color: #e83e8c;}
     <code>timeout</code> Is the timeout value for the post request in seconds.<br>
     <code>ttl</code> is the time to live in seconds for the push message.<br>
     And that is all you need to do to successfully send a push message to a client. Of course, the public key the client subscribed to must match the private key used here.</p>
+
     <h3>Encryption</h3>
-    In case you want to assemble your post requests yourself you can just use our API for encrypting your data. This is done using the following function:
+    <p>In case you want to assemble your post requests yourself you can just use our API for encrypting your data. This is done using the following function:
     <p><pre>
     webpush::encrypt \
       -data /data/ \
@@ -261,9 +266,10 @@ pre {color: #e83e8c;}
       -p256dh /p256dh/ \
       -salt /salt/ \
       -mode /mode/</pre></p>
-    This function encrypts the data using a private key in form of a pem file, the auth secret, the client public key (<code>p256dh</code>) and a salt value. <code>auth, p256dh, salt</code> are expected in binary format. Currently "aesgcm" and "aes128gcm" are supportet content encryption modes. The encrypted data is returned in binary format.
+<p>This function encrypts the data using a private key in form of a pem file, the auth secret, the client public key (<code>p256dh</code>) and a salt value. <code>auth, p256dh, salt</code> are expected in binary format. Currently "aesgcm" and "aes128gcm" are supportet content encryption modes. The encrypted data is returned in binary format.</p>
+
     <h3>Decryption</h3>
-    <p>If you want to write your own client or want to use this encryption scheme for other purposes you can also use our API to decrypt messages using the following function:</p>
+    <p>If you want to write your own client or want to use this encryption scheme for other purposes you can also use our API to decrypt messages using the following function:
     <p><pre>
     webpush::decrypt \
       -encrData /encrData/ \
@@ -275,7 +281,15 @@ pre {color: #e83e8c;}
 <p>As input you need the encrypted data, the private key matching the public key that was used for encryption, i.e. the private key matching the public key in “p256dh” and the auth as well as the salt used for encryption. Currently supported GCM modes are “aesgcm” and “aes128gcm”.</p>
 
     <h2>Conclusion</h2>
-    <p>Hopefully we could shed some light on how the Web Push protocol as well as payload encryption works. Of course, one could simply use on of the available libraries and be done with it, however, it is often good to understand what is actually happening in order to evaluate all risks of a new technology appropriately. </p>
+<p>Hopefully we could shed some light on how the Web Push protocol as well as payload encryption works. Of course, one could simply use on of the available libraries and be done with it, however, it is often good to understand what is actually happening in order to evaluate all risks of a new technology appropriately. </p>
+
+<h2>References</h2>
+<ul>
+  <li>RFC 8030: <a href="https://tools.ietf.org/html/rfc8030">Generic Event Delivery Using HTTP Push</a>
+  <li>RFC 8291: <a href="https://tools.ietf.org/html/rfc8291">Message Encryption for Web Push</a>
+  <li>RFC 5288: <a href="https://tools.ietf.org/html/rfc5288">AES Galois Counter Mode (GCM) Cipher Suites for TLS</a>
+  <li>RFC 8188: <a href="https://tools.ietf.org/html/rfc8188">Encrypted Content-Encoding for HTTP</a>
+</ul>
   </div>
   </body>
 </html>
