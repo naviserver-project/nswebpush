@@ -38,7 +38,7 @@ pre {color: #e83e8c;}
     <li> Browsers implement a <b>push service</b> which is responsible for delivering a push message to the correct client. </li>
     </ul>
     <h2>The Web Push Protocol</h2>
-    In essence, the Web Push Protocol works as follows: The client subscribes to your push notifications using a public key which identifies your application. This is done using the <a href=https://developer.mozilla.org/en-US/docs/Web/API/Push_API>Push API</a> implemented by the browser (based on the <a href=https://developer.mozilla.org/de/docs/Web/API/Service_Worker_API>Service Worker API</a>). The result of this process is a subscription that usually looks something like this:
+    In essence, the Web Push Protocol works as follows: The client subscribes to your push notifications using a public key which identifies your application. This is done using the <a href=https://developer.mozilla.org/en-US/docs/Web/API/Push_API>Push API</a> implemented by the browser (based on the <a href=https://developer.mozilla.org/de/docs/Web/API/Service_Worker_API>Service Worker API</a>, see as well <a href="https://www.w3.org/TR/push-api/">Push API, W3C Working Draft 15 Dec 2017</a>). The result of this process is a subscription that usually looks something like this:
     <p><pre>
     {
       "endpoint": "https://fcm.googleapis.com/fcm/send/fKx5MYaL80w:APA91bF3ssm...",
@@ -285,10 +285,13 @@ pre {color: #e83e8c;}
 
 <h2>References</h2>
 <ul>
+  <li>W3C: <a href="https://www.w3.org/TR/push-api/">Push API, W3C Working Draft 15 Dec 2017</a>
   <li>RFC 8030: <a href="https://tools.ietf.org/html/rfc8030">Generic Event Delivery Using HTTP Push</a>
   <li>RFC 8291: <a href="https://tools.ietf.org/html/rfc8291">Message Encryption for Web Push</a>
   <li>RFC 5288: <a href="https://tools.ietf.org/html/rfc5288">AES Galois Counter Mode (GCM) Cipher Suites for TLS</a>
   <li>RFC 8188: <a href="https://tools.ietf.org/html/rfc8188">Encrypted Content-Encoding for HTTP</a>
+  <li>Mozilla: <a href=https://developer.mozilla.org/en-US/docs/Web/API/Push_API>Push API</a>
+  <li>Mozilla: <a href=https://developer.mozilla.org/de/docs/Web/API/Service_Worker_API>Service Worker API</a>
 </ul>
   </div>
   </body>
