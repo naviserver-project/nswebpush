@@ -54,7 +54,7 @@ install: $(TCL)
 	done
 
 DEMOFILES = \
-	demo/Report.html demo/index.tcl demo/webpush-demo.tcl \
+	demo/report.html demo/index.tcl demo/webpush-demo.tcl \
 	demo/prime256v1_key.pem demo/sw.js demo/webpush.js demo/index.css \
 	demo/webpush-send.png demo/webpush-subscribe.png
 
