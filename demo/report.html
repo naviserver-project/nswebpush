@@ -52,7 +52,7 @@ pre {color: #e83e8c;}
     </p>
     <h3>VAPID</h3>
     <p>
-    For a push service to forward your message to the client it needs to be certain that it actually came from you. This is ensured through a <a href=https://jwt.io/>JSON Web Token</a> (jwt) that must be included in the header of every push message. This jwt must be created according to the <a href=https://tools.ietf.org/id/draft-ietf-webpush-vapid-03.html>VAPID specification</a>.
+    For a push service to forward your message to the client it needs to be certain that it actually came from you. This is ensured through a <a href=https://jwt.io/>JSON Web Token</a> (jwt) that must be included in the header of every push message. This jwt must be created according to the <a href=https://tools.ietf.org/id/draft-ietf-webpush-vapid-03.html>VAPID specification</a> (see also: RFC 8292: <a href="https://tools.ietf.org/html/rfc8292">Voluntary Application Server Identification (VAPID) for Web Push</a>).
     </p>
     <h4>Generating VAPID keys</h4>
     <p>The first thing you will need is a private key that is used for identification. The Web Push and VAPID encryption mechanisms use the elliptic-curve Diffie-Hellman (ECDH) protocol for key agreement. We will not go into detail here how it works, just note that this algorithm uses geometric curves to derive keys.<br>Many different curves exist; for Web Push we need a curve called "prime 256v1" (abbreviated“P-256”). To create a new private key in Tcl we can use the NaviServer crypto API:</p>
@@ -290,6 +290,7 @@ pre {color: #e83e8c;}
   <li>RFC 8291: <a href="https://tools.ietf.org/html/rfc8291">Message Encryption for Web Push</a>
   <li>RFC 5288: <a href="https://tools.ietf.org/html/rfc5288">AES Galois Counter Mode (GCM) Cipher Suites for TLS</a>
   <li>RFC 8188: <a href="https://tools.ietf.org/html/rfc8188">Encrypted Content-Encoding for HTTP</a>
+  <li>RFC 8292: <a href="https://tools.ietf.org/html/rfc8292">Voluntary Application Server Identification (VAPID) for Web Push</a>
   <li>Mozilla: <a href=https://developer.mozilla.org/en-US/docs/Web/API/Push_API>Push API</a>
   <li>Mozilla: <a href=https://developer.mozilla.org/de/docs/Web/API/Service_Worker_API>Service Worker API</a>
 </ul>
