@@ -1,0 +1,70 @@
+Web Push for NaviServer
+=======================
+
+Release 0.1
+-----------
+
+    Georg Prohaska <georg.prohaska@s.wu.ac.at>
+    neumann@wu-wien.ac.at
+
+This is a NaviServer module that implements a Web Push Interface
+for NaviServer. In essence, this module implements the API functions
+to allow a NaviServer based application server to send messages
+to a web client via Web Push services (e.g. Google or Mozilla,
+depending on the web client), such as Web Push notifications.
+These service support asynchronous delivery (in case the client
+is currently not online). 
+
+   webpush::send
+   webpush::encrypt
+   webpush::decrypt   
+
+For more details, see the report.html in the demo directory. So far,
+there is no integration with the OpenACS notification API.
+
+Requirements:
+
+- NaviServer (4.99.17 or newer) with the integrated support activated
+  (default).
+- Tcllib (e.g. 1.15) installed on the Tcl library search path.
+
+
+Testing:
+
+  Run the following command in the source directory of this module
+  
+      make test
+      
+  The test requires a functioning NaviServer installation.
+  
+Installation:
+
+   The default installation installs the nswebpush module into
+   /usr/local/ns/tcl/nswebpush and the demo to
+   /usr/local/ns/pages/webpush-demo. As for other NaviServer modules,
+   the install prefix "/usr/local/ns" can be altered by specifying
+   "NAVISERVER=" in the invocation of "make".
+   
+      make install
+      make install-demo
+
+   OpenACS uses different directory directory structures. Therefore,
+   one case specify in such cases the install targets in more detail.
+   For example, a sample OpenACS installation might use
+   
+      make MODULEDIR=/var/www/openacs.org/tcl/  install
+      make DEMODIR=/var/www/openacs.org/www/    install-demo
+
+Configuration:
+
+   In order to enable the nswebpush module, one has to add
+   a section like the following to your NaviServer configuration file.
+   
+      ns_section ns/server/${server}/modules {
+          ns_param nswebpush tcl
+      }
+
+   #### something else needed?
+   recommandation for private keys?
+   claims?
+

@@ -3,6 +3,11 @@ package require nsf
 
 namespace eval webpush {
     #
+    # Version number of this module.
+    #
+    set version 0.1
+    
+    #
     #  webpush::send
     #
     nsf::proc send {

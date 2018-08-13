@@ -13,8 +13,6 @@ set pushstatus ""
 #
 set script [ns_url2file [ns_conn url]]
 set scriptDir [file dirname $script]
-source $scriptDir/webpush.tcl
-ns_log notice "script $scriptDir/webpush.tcl was loaded"
 
 if {$subscription ne ""} {
     #
@@ -35,6 +33,7 @@ if {$subscription ne ""} {
 
     #set privPem "[ns_info home]/modules/vapid/prime256v1_key.pem"
     set privPem "$scriptDir/prime256v1_key.pem"
+    ns_log notice "Using $privPem as .pem file containing the private key of the server"
 
     #
     # Local path
@@ -81,7 +80,7 @@ ns_return 200 text/html [subst {
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="https://code.getmdl.io/1.2.1/material.indigo-pink.min.css">
     <script defer src="https://code.getmdl.io/1.2.1/material.min.js"></script>
-    <link rel="stylesheet" href="styles/index.css">
+    <link rel="stylesheet" href="index.css">
     <style>
     .js-subscription-json {color: grey;}
     </style>
@@ -161,7 +160,7 @@ ns_return 200 text/html [subst {
     </div>
     </div>
     <p>For the technical details behind this demo,
-    see <a href="Report.html">Implementing Web Push with NaviServer</a>.
+    see <a href="report.html">Implementing Web Push with NaviServer</a>.
     </section>
 
     </main>

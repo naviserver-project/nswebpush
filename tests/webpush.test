@@ -1,19 +1,17 @@
 package require tcltest
 package require json
 
-set script [ns_url2file [ns_conn url]]
-set scriptDir [file dirname $script]
-source $scriptDir/webpush.tcl
+#
+# For testing purposes, we use the module source directory, the place
+# where "make test" is to be executed. Furthermore, we use for testing
+# always the same key pair, which is taken from the demo directory.
+#
+set scriptDir [pwd]/..
+source $scriptDir/webpush-procs.tcl
 ns_log notice "script $scriptDir/webpush.tcl was loaded"
-# source [ns_info home]/pages/pushnotificationsapi/webpush.tcl
 
-#set ::vapidCertPath "[ns_info home]/modules/vapid"
+set ::vapidCertPath $scriptDir/demo
 
-#
-# Set everything to the $scriptdir containing the matching certificate
-# of the test cases. Should be probably changed later.
-#
-set ::vapidCertPath $scriptDir
 #
 # This is the endpoint this script sends 3 notifications to for testing
 #
@@ -330,3 +328,9 @@ namespace eval webpush {
 
     cleanupTests
 }
+
+# Local variables:
+#    mode: tcl
+#    tcl-indent-level: 4
+#    indent-tabs-mode: nil
+# End:
