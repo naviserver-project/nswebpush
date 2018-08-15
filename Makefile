@@ -29,7 +29,7 @@ endif
 MODNAME = nswebpush
 
 #
-# List of components to be installed as the the Tcl module section
+# List of components to be installed as the Tcl module section
 #
 TCL =	webpush-procs.tcl \
 	README

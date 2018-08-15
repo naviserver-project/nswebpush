@@ -6,7 +6,7 @@ namespace eval webpush {
     # Version number of this module.
     #
     set version 0.1
-    
+
     #
     #  webpush::send
     #
@@ -310,19 +310,21 @@ namespace eval webpush {
         #
         # Derive key and nonce from client public key, server public
         # key, initial key material and salt input parameters (except
-        # mode which can be 'aesgcm' or 'aes128gcm') are expected
-        # in binary encoding returns the encryption key and nonce in
-        # binary for webpush as a list (first element key, 2nd nonce)
+        # mode which can be 'aesgcm' or 'aes128gcm') are expected in
+        # binary encoding.
+        #
+        # @return the encryption key and nonce in binary for webpush
+        # as a list (first element key, 2nd nonce)
 
         if {$mode eq "aes128gcm"} {
-            set keyInfo [binary format A*x "Content-Encoding: aes128gcm"]
+            set keyInfo   [binary format A*x "Content-Encoding: aes128gcm"]
             set nonceInfo [binary format A*x "Content-Encoding: nonce"]
         } else {
-            set keyInfo [generateInfo aesgcm $clientPubKey $serverPubKey]
+            set keyInfo   [generateInfo aesgcm $clientPubKey $serverPubKey]
             set nonceInfo [generateInfo nonce $clientPubKey $serverPubKey]
         }
 
-        set key [ns_crypto::md hkdf -digest sha256 -salt $salt -secret $ikm -info $keyInfo -encoding binary 16]
+        set key   [ns_crypto::md hkdf -digest sha256 -salt $salt -secret $ikm -info $keyInfo -encoding binary 16]
         set nonce [ns_crypto::md hkdf -digest sha256 -salt $salt -secret $ikm -info $nonceInfo -encoding binary 12]
 
         return [list $key $nonce]
@@ -351,8 +353,9 @@ namespace eval webpush {
 
     proc padData {mode data} {
         #
-        # Fill the data with maximum padding according to the mode
-        # returns the padded data.
+        # Fill the data with maximum padding according to the mode.
+        #
+        # @return padded data.
         #
 
         if {$mode eq "aesgcm"} {
@@ -441,8 +444,12 @@ namespace eval webpush {
         # Do encryption:
         #
         set paddedData [padData $mode $data]
-        set cipher [::ns_crypto::aead::encrypt string -cipher aes-128-gcm -iv $nonce -key $key -encoding binary $paddedData]
-
+        set cipher [::ns_crypto::aead::encrypt string \
+                        -cipher aes-128-gcm \
+                        -iv $nonce \
+                        -key $key \
+                        -encoding binary \
+                        $paddedData]
         #
         # aes128gcm requires the header to be sent in the payload
         #
@@ -462,47 +469,53 @@ namespace eval webpush {
         # total length of the header.
         #
 
-        # salt are the first 16 bytes
+        # The salt is provided in the first 16 bytes
         set salt [string range $bytes 0 15]
 
         #
-        # the length of the key material is set in byte 21
+        # The length of the key material is set in byte 21.
         #
         binary scan [string index $bytes 20] c len
-        set key [string range $bytes 21 [expr {20 + $len}]]
+        set key [string range $bytes 21 20+$len]
         set headerlen [expr {16 + 4 + 1 + $len}]
         return [list $key $salt $headerlen]
     }
 
     proc unpad {data mode} {
         #
-        # Unpad data according to the mode.
+        # Unpad data depending to the mode.
         #
-        if {$mode eq "aesgcm"} {
-            #
-            # Padding consists of two bytes indicating the size of the
-            # padding followed by that many null bytes.
-            #
-            #
-            # Get padding length and remove it from data
-            #
-            binary scan $data S paddingLength
-            set data [string range $data 2 end]
-            #
-            # Remove paddingLength number of bytes (padding).
-            #
-            return [string range $data $paddingLength end]
+        switch $mode {
+            aesgcm {
+                #
+                # Padding consists of two bytes indicating the size of
+                # the padding followed by that many null bytes.
+                #
+                #
+                # Get padding length and remove it from data.
+                #
+                binary scan $data S paddingLength
+                set data [string range $data 2 end]
+                #
+                # Remove paddingLength number of bytes (padding).
+                #
+                return [string range $data $paddingLength end]
 
-        } elseif {$mode eq "aes128gcm"} {
-            #
-            # Remove Null bytes at the end are padding.
-            #
-            set data [string trimright $data "\x00"]
-            #
-            # One delimiter bytes separates the data and the padding
-            # remove this byte
-            #
-            return [string range $data 0 end-1]
+            }
+            aes128gcm {
+                #
+                # Remove null bytes at the end are padding.
+                #
+                set data [string trimright $data "\x00"]
+                #
+                # One delimiter bytes separates the data and the
+                # padding remove this byte.
+                #
+                return [string range $data 0 end-1]
+            }
+            default {
+                error "unpad: unknown mode '$mode', valid are aesgcm and aes128gcm"
+            }
         }
     }
 
@@ -526,7 +539,7 @@ namespace eval webpush {
         # @param mode can be 'aesgcm' or 'aes128gcm'
         # other parameters (including data) are expected in binary format
         #
-        # @param return the encrypted message in binary format
+        # @return the encrypted message in binary format
         #
         if {$serverPubKey eq "" || $salt eq ""} {
             if {$mode ne "aes128gcm"} {
@@ -559,7 +572,7 @@ namespace eval webpush {
         set nonce [lindex $keyNonce 1]
 
         #
-        # the tag are the last 16 bytes of the data
+        # The tag is the last 16 bytes of the data.
         #
         set tag [string range $encrData end-15 end]
         set data [string range $encrData 0 end-16]
@@ -577,10 +590,10 @@ namespace eval webpush {
 
     proc dictToJson {dict} {
         #
-        # Serializes a dict to JSON.  No testing for nested dicts or
-        # arrays, these will be simply added as a string the JSON is
-        # in compact form, meaning no whitespaces and newlines between
-        # keys/values.
+        # Serializes a Tcl dict to compact JSON.  No testing for
+        # nested dicts or arrays, these will be simply added as a
+        # string the JSON is in compact form, meaning no whitespaces
+        # and newlines between keys/values.
 
         set pairs {}
         dict for {key value} $dict {
