@@ -577,16 +577,18 @@ namespace eval webpush {
 
     proc dictToJson {dict} {
         #
-        # Serializes a dict to JSON.  no testing for nested dicts or
-        # arrays, these will be simply added as a string the json is
+        # Serializes a dict to JSON.  No testing for nested dicts or
+        # arrays, these will be simply added as a string the JSON is
         # in compact form, meaning no whitespaces and newlines between
         # keys/values.
 
-        set retJson "{"
+        set pairs {}
         dict for {key value} $dict {
-            append retJson [subst {"$key":"$value",}]
+            regsub -all \" $key "\\\"" key
+            regsub -all \" $value "\\\"" value
+            lappend pairs [subst {"$key":"$value"}]
         }
-        return "[string range $retJson 0 end-1]}"
+        return "{[join $pairs ,]}"
     }
 
 }
