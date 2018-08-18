@@ -63,8 +63,10 @@ Configuration:
       ns_section ns/server/${server}/modules {
           ns_param nswebpush tcl
       }
-
-   #### something else needed?
-   recommandation for private keys?
-   claims?
+      
+   To send a push notification the minimal requirements are a private
+   key in pem format and a subscription that was registered to the 
+   matching public key. A minimal claim just contains a mailto URI
+   in the 'sub' field. This field currently must contain a mailto
+   otherwise an exception will be thrown.
 
