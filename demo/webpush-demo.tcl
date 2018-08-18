@@ -19,13 +19,14 @@ if {$subscription ne ""} {
     # Subscription will be in JSON
     #
     set subscrDict [::json::json2dict $subscription]
-    set keys [dict get $subscrDict keys]
 
     #
-    # transform to correctly formatted tcl dict
+    # Transform nested dict into a flat dict (attribute/value list)
     #
-    set subscription [subst {endpoint [dict get $subscrDict endpoint] auth [dict get $keys auth] p256dh [dict get $keys p256dh]}]
-
+    set subscription [list \
+                          endpoint [dict get $subscrDict endpoint] \
+                          auth     [dict get $subscrDict keys auth] \
+                          p256dh   [dict get $subscrDict keys p256dh]]
     #
     # Private key. For the time being, we use the privatePem files of
     # the demo package. Don't use this in production.
@@ -44,30 +45,30 @@ if {$subscription ne ""} {
     # send push notification
     #
     try {
-	webpush::send \
-	    -subscription $subscription \
-	    -data $text \
-	    -claim {sub mailto:georg@test.com} \
-	    -privateKeyPem $privPem \
-	    -localKeyPath $localPath \
-	    -mode aesgcm \
-	    -timeout 60
+        webpush::send \
+            -subscription $subscription \
+            -data $text \
+            -claim {sub mailto:georg@test.com} \
+            -privateKeyPem $privPem \
+            -localKeyPath $localPath \
+            -mode aesgcm \
+            -timeout 60
 
     } on error {errorMsg errorDict} {
-	ns_log notice "webpush::send ended with error: $errorMsg - $errorDict"
-	set errorInfo     [dict get $errorDict -errorinfo]
-	set jsonErrorDict [::json::json2dict $errorInfo]
-	if {[dict exists $jsonErrorDict message]} {
-	    set pushstatus "$errorMsg [info get $jsonErrorDict message]"
-	} else {
-	    set pushstatus "$errorMsg $errorInfo"
-	}
+        ns_log notice "webpush::send ended with error: $errorMsg - $errorDict"
+        set errorInfo     [dict get $errorDict -errorinfo]
+        set jsonErrorDict [::json::json2dict $errorInfo]
+        if {[dict exists $jsonErrorDict message]} {
+            set pushstatus "$errorMsg [info get $jsonErrorDict message]"
+        } else {
+            set pushstatus "$errorMsg $errorInfo"
+        }
     } on ok {returnValue} {
-	if {$returnValue < 300} {
-	    set pushstatus "Push notification sent successfully!"
-	} else {
-	    set pushstatus "Some error occurred when sending push notification!"
-	}
+        if {$returnValue < 300} {
+            set pushstatus "Push notification sent successfully!"
+        } else {
+            set pushstatus "Some error occurred when sending push notification!"
+        }
     }
 }
 
@@ -131,7 +132,7 @@ ns_return 200 text/html [subst {
     <p>Once you've subscribed your user, your subscription is
     typically sent to the server and saved there in a database such
     that the server can send you a message via this subscription.
-    The subscription is not saved for this demo. 
+    The subscription is not saved for this demo.
     </div>
     <div class="mdl-cell mdl-cell--6-col">
     <p>The application server can now send an encrypted message to the
@@ -172,3 +173,9 @@ ns_return 200 text/html [subst {
   </html>
 
   }]
+
+# Local variables:
+#    mode: tcl
+#    tcl-indent-level: 4
+#    indent-tabs-mode: nil
+# End:
