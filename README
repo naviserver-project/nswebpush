@@ -36,6 +36,9 @@ Testing:
       make test
       
   The test requires a functioning NaviServer installation.
+  Three push notifications are sent during testing. To make the 
+  respective tests pass set the ::testEndpoint variable at the start 
+  of the script to a valid subscription.
   
 Installation:
 
