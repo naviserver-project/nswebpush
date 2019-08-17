@@ -17,7 +17,7 @@ namespace eval webpush {
         -privateKeyPem
         -localKeyPath
         {-mode aesgcm}
-        {-timeout 2.0}
+        {-timeout 5.0}
         {-ttl 0}
     } {
         #
@@ -142,8 +142,8 @@ namespace eval webpush {
             set encrData [encrypt \
                               -data $data \
                               -privateKeyPem $localPrivateKeyPem \
-                              -auth [ns_base64urldecode [dict get $subscription auth]] \
-                              -p256dh [ns_base64urldecode [dict get $subscription p256dh]] \
+                              -auth [ns_base64urldecode -binary [dict get $subscription auth]] \
+                              -p256dh [ns_base64urldecode -binary [dict get $subscription p256dh]] \
                               -salt $salt \
                               -mode $mode]
             #
@@ -157,9 +157,9 @@ namespace eval webpush {
             ns_set update $headers "content-length" [string length $encrData]
 
             #
-            # queue the request
+            # send the request
             #
-            set req [ns_http queue -method POST \
+            set reply [ns_http run -method POST \
                          -headers $headers \
                          -timeout $timeout \
                          -body $encrData \
@@ -169,20 +169,15 @@ namespace eval webpush {
             #
             # Push messages without a payload do not have a request body
             #
-            set req [ns_http queue -method POST \
+            set reply [ns_http run -method POST \
                          -headers $headers \
                          -timeout $timeout \
                          -body "" \
                          $endpoint]
         }
-        set replyHeaders [ns_set create]
-
-        #
-        # wait for answer of push service and record reply
-        #
-        ns_http wait -result result -headers $replyHeaders -status status $req
+        set status [dict get $reply status]
         if {$status > 202} {
-            error "Webpush failed!" $result $status
+            error "Webpush failed with status $status!" [dict get $reply body] $status
         }
 
         return $status
@@ -291,16 +286,18 @@ namespace eval webpush {
         #
         # @return info in binary format
 
-        set info [binary format A18 "Content-Encoding: "]
-        append info [binary format A* $type]
-        append info [binary format x]
-        append info [binary format A5 "P-256"]
-        append info [binary format x]
         # length of keys are 65 bytes for webpush
-        append info [binary format S1 65]
-        append info $clientPubKey
-        append info [binary format S1 65]
-        append info $serverPubKey
+
+        append info \
+            [binary format A18 "Content-Encoding: "] \
+            [binary format A* $type] \
+            [binary format x] \
+            [binary format A5 "P-256"] \
+            [binary format x] \
+            [binary format S1 65] \
+            $clientPubKey \
+            [binary format S1 65] \
+            $serverPubKey
 
         return $info
     }
@@ -358,16 +355,23 @@ namespace eval webpush {
         # @return padded data.
         #
 
+        #
+        # The following line is essential to ensure, we are working on
+        # a byte array.
+        #
+        set data [binary format A* $data]
+
         if {$mode eq "aesgcm"} {
             #
             # maximum size for aesgcm is 4078
             #
-            set paddingLength [expr {4078 - [string bytelength $data]}]
+            set paddingLength [expr {4078 - [string length $data]}]
 
             #
             # The first two bytes of the padding indicate how many
             # bytes of padding follow the padding itself consists of
             # NULL bytes.
+            #
             set padding [binary format Sx$paddingLength $paddingLength]
             return $padding$data
 
@@ -377,7 +381,7 @@ namespace eval webpush {
             # header) - 16 for the cipher tag - 1 for the delimiter
             # byte.
             #
-            set paddingLength [expr {4010 - 16 - 1 - [string bytelength $data]}]
+            set paddingLength [expr {4010 - 16 - 1 - [string length $data]}]
             set padding \x02
             append padding [binary format x$paddingLength]
             return $data$padding
@@ -410,6 +414,8 @@ namespace eval webpush {
         -salt
         -mode
     } {
+        #ns_log notice "obj(data) [nsf::__db_get_obj $data]"
+
         #
         # Encrypt the data using a private key from a pem file, the
         # auth and p256dh fields of a subscription and a 16 byte
@@ -422,7 +428,7 @@ namespace eval webpush {
         #
         # @return the encrypted message in binary format
 
-        if {[string bytelength $data] > 4078} {
+        if {[string length $data] > 4078} {
             error "data is too large, maximum is 4078 bytes!"
         }
         set serverPubKey [ns_crypto::eckey pub -pem $privateKeyPem -encoding binary]
@@ -436,9 +442,7 @@ namespace eval webpush {
         #
         # Create encryption key and nonce
         #
-        set keyNonce [createEncryptionKeyNonce $p256dh $serverPubKey $ikm $salt $mode]
-        set key [lindex $keyNonce 0]
-        set nonce [lindex $keyNonce 1]
+        lassign [createEncryptionKeyNonce $p256dh $serverPubKey $ikm $salt $mode] key nonce
 
         #
         # Do encryption:
@@ -546,11 +550,8 @@ namespace eval webpush {
                 error "Server public key and salt required for $mode GCM mode!"
             }
             # get key and salt from header
-            set keySalt [extractHeader $encrData]
-            set serverPubKey [lindex $keySalt 0]
-            set salt [lindex $keySalt 1]
+            lassign [extractHeader $encrData] serverPubKey salt headerlen
             # remove header
-            set headerlen [lindex $keySalt 2]
             set encrData [string range $encrData $headerlen end]
         }
         set sharedSecret [ns_crypto::eckey sharedsecret \
@@ -567,9 +568,7 @@ namespace eval webpush {
         #
         # create encryption key and nonce
         #
-        set keyNonce [createEncryptionKeyNonce $localPub $serverPubKey $ikm $salt $mode]
-        set key [lindex $keyNonce 0]
-        set nonce [lindex $keyNonce 1]
+        lassign [createEncryptionKeyNonce $localPub $serverPubKey $ikm $salt $mode] key nonce
 
         #
         # The tag is the last 16 bytes of the data.
