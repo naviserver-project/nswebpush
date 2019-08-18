@@ -280,26 +280,21 @@ namespace eval webpush {
     proc generateInfo {type clientPubKey serverPubKey} {
         #
         # Generate the key/nonce info according to specification from
-        # the clients public key and servers private key type should
-        # be 'aesgcm', 'aes128gcm' or 'nonce' keys are expected in
-        # binary format.
+        # the clients public key and servers private key. "type"
+        # should be 'aesgcm', 'aes128gcm' or 'nonce' keys are expected
+        # in binary format.
         #
         # @return info in binary format
 
         # length of keys are 65 bytes for webpush
-
-        append info \
-            [binary format A18 "Content-Encoding: "] \
-            [binary format A* $type] \
-            [binary format x] \
-            [binary format A5 "P-256"] \
-            [binary format x] \
-            [binary format S1 65] \
-            $clientPubKey \
-            [binary format S1 65] \
-            $serverPubKey
-
-        return $info
+        return [binary format A18A*xA5xS1A*S1A* \
+                    "Content-Encoding: " \
+                    $type \
+                    "P-256" \
+                    65 \
+                    $clientPubKey \
+                    65 \
+                    $serverPubKey]
     }
 
 
@@ -355,12 +350,6 @@ namespace eval webpush {
         # @return padded data.
         #
 
-        #
-        # The following line is essential to ensure, we are working on
-        # a byte array.
-        #
-        set data [binary format A* $data]
-
         if {$mode eq "aesgcm"} {
             #
             # maximum size for aesgcm is 4078
@@ -372,19 +361,17 @@ namespace eval webpush {
             # bytes of padding follow the padding itself consists of
             # NULL bytes.
             #
-            set padding [binary format Sx$paddingLength $paddingLength]
-            return $padding$data
+            return [binary format Sx${paddingLength}A* $paddingLength $data]
 
         } elseif {$mode eq "aes128gcm"} {
             #
-            # Set maximum padding length: maximum lengt(4096 - 86 for
+            # Set maximum padding length: maximum length(4096 - 86 for
             # header) - 16 for the cipher tag - 1 for the delimiter
             # byte.
             #
             set paddingLength [expr {4010 - 16 - 1 - [string length $data]}]
-            set padding \x02
-            append padding [binary format x$paddingLength]
-            return $data$padding
+            #ns_log notice "=========================================================== aes128gcm"
+            return [binary format A*cx${paddingLength} $data 2]
 
         } else {
             error "Unknown GCM mode $mode. Only aesgcm and aes128gcm are supported"
@@ -396,14 +383,11 @@ namespace eval webpush {
         # Create the encryption content encoding header according to
         # aes128gcm draft.  Parameters are expected in binary format.
 
-        set result $salt
-        #
-        # Set record size to maximum for now.
-        #
-        append result [binary format I 4096]
-        append result [binary format c [string length $publicKey]]
-        append result $publicKey
-        return $result
+        return [binary format A*IcA* \
+                    $salt \
+                    4096 \
+                    [string length $publicKey] \
+                    $publicKey]
     }
 
     nsf::proc encrypt {
@@ -415,6 +399,7 @@ namespace eval webpush {
         -mode
     } {
         #ns_log notice "obj(data) [nsf::__db_get_obj $data]"
+        #ns_log notice "string length data: [string length $data]"
 
         #
         # Encrypt the data using a private key from a pem file, the
@@ -447,21 +432,24 @@ namespace eval webpush {
         #
         # Do encryption:
         #
-        set paddedData [padData $mode $data]
         set cipher [::ns_crypto::aead::encrypt string \
                         -cipher aes-128-gcm \
                         -iv $nonce \
                         -key $key \
                         -encoding binary \
-                        $paddedData]
+                        [padData $mode $data]]
         #
         # aes128gcm requires the header to be sent in the payload
         #
-        set result {}
         if {$mode eq "aes128gcm"} {
-            set result [createAes128gcmHeader $salt $serverPubKey]
+            set header [createAes128gcmHeader $salt $serverPubKey]
+        } else {
+            set header ""
         }
-        append result [dict get $cipher bytes][dict get $cipher tag]
+        set result [binary format A*A*A* \
+                        $header \
+                        [dict get $cipher bytes]\
+                        [dict get $cipher tag]]
         return $result
     }
 
@@ -498,13 +486,12 @@ namespace eval webpush {
                 #
                 # Get padding length and remove it from data.
                 #
-                binary scan $data S paddingLength
-                set data [string range $data 2 end]
+                binary scan $data SA* paddingLength data
+
                 #
                 # Remove paddingLength number of bytes (padding).
                 #
                 return [string range $data $paddingLength end]
-
             }
             aes128gcm {
                 #
@@ -545,7 +532,12 @@ namespace eval webpush {
         #
         # @return the encrypted message in binary format
         #
-        if {$serverPubKey eq "" || $salt eq ""} {
+
+        #
+        # Do NOT use {$serverPubKey eq ""} here, since this destroy
+        # the purity of the string and leads to problem in Tcl 8.5.
+        #
+        if {[string length $serverPubKey] == 0 || [string length $salt] == 0} {
             if {$mode ne "aes128gcm"} {
                 error "Server public key and salt required for $mode GCM mode!"
             }
@@ -554,11 +546,11 @@ namespace eval webpush {
             # remove header
             set encrData [string range $encrData $headerlen end]
         }
+
         set sharedSecret [ns_crypto::eckey sharedsecret \
                               -pem $privateKeyPem \
                               -encoding binary \
                               $serverPubKey]
-
         #
         # make initial key material
         #
@@ -583,7 +575,6 @@ namespace eval webpush {
                            -tag $tag \
                            -encoding binary \
                            $data]
-
         return [unpad $decrypted $mode]
     }
 
