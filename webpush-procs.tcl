@@ -329,9 +329,7 @@ namespace eval webpush {
         # mode.
         #
         if {$mode eq "aes128gcm"} {
-            set authInfo [binary format A*x "WebPush: info"]
-            append authInfo $p256dh
-            append authInfo $ServerPubKey
+            set authInfo [binary format A*xA* "WebPush: info" $ServerPubKey]
         } else {
             set authInfo [binary format A*x "Content-Encoding: auth"]
         }
