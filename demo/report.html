@@ -21,7 +21,7 @@ pre {color: #e83e8c;}
       <h1 class="display-4">Implementing Web Push with NaviServer</h1>
 	<p class="lead">This article gives an overview over the Web Push protocol, VAPID and payload encryption.
 	Additionally, we present a Tcl API that based on NaviServer's cryptographic primitives to implement Web Push
-	supporting both "aesgcm" and "aes128gcm". To use ist, please get anthe most recent version of NaviServer and OpenSSL.</p>
+	supporting both "aesgcm" and "aes128gcm". To use it, please get anthe most recent version of NaviServer and OpenSSL.</p>
       </div>
   </div>
   <div class="container" style="max-width: 50%;">
@@ -72,7 +72,7 @@ pre {color: #e83e8c;}
     ns_crypto::eckey pub \
         -pem MyPrivateKey.pem \
         -encoding base64url</pre></p>
-    <p>This function returns as result the corresponding public key in DER format base64url encoded. Note that this is not exactly the same output as OpenSSL’s <code>openssl ecparam  ... -pubout ...</code> function. The first few bytes in the standard PEM format define which curve is used. Since this is clear for Web Push by specification this is left out for public keys. Public keys are 65 bytes long. Hence, with the OpenSSL command line itnerface, it is necessary to strip the unneeded content via unix shell commands:</p>
+    <p>This function returns as result the corresponding public key in DER format base64url encoded. Note that this is not exactly the same output as OpenSSL’s <code>openssl ecparam  ... -pubout ...</code> function. The first few bytes in the standard PEM format define which curve is used. Since this is clear for Web Push by specification this is left out for public keys. Public keys are 65 bytes long. Hence, with the OpenSSL command line interface, it is necessary to strip the unneeded content via unix shell commands:</p>
     <p><pre>
     openssl ecparam \
         -in MyPrivateKey.pem \
@@ -200,7 +200,7 @@ pre {color: #e83e8c;}
     <h4>Padding</h4>
     <p>Padding is used to avoid potential attackers to distinguish different types of messages based on the length of the payload. In aesgcm padding consists of a 16-bit big-endian integer (two bytes) indicating how many bytes of padding there is followed by that number of null bytes. Padding is prepended to the data before encryption. Padding is optional, so you do not have to add any padding if you do not want to; however, even if you add no padding the first two bytes must then contain the integer 0 encoded in 16 bits.</p>
     <h4>Encrypting the payload</h4>
-    <p>To encrypt our payload we use the cipher aes-128-gcm. The nonce serves as an initialisation vector (iv). Our post request also needs to contain the authentication tag which is 16 bytes long for Web Push. NaviServer provides encryption functionality as follows:</p>
+    <p>To encrypt our payload we use the cipher aes-128-gcm. The nonce serves as an initialization vector (iv). Our post request also needs to contain the authentication tag which is 16 bytes long for Web Push. NaviServer provides encryption functionality as follows:</p>
     <p><pre>
     ns_crypto::aead::encrypt string \
         -cipher aes-128-gcm \
