@@ -298,7 +298,7 @@ namespace eval webpush {
     ##########################################################################
 
     test decrypt-aesgcm-1.0 {
-        full encrypt and decrypt rountrip
+        full encrypt and decrypt roundtrip
         using aesgcm
     } -body {
         set data "Encryptiontest"
@@ -365,7 +365,7 @@ namespace eval webpush {
 
 
     test decrypt-aes128gcm-1.0  {
-        full encrypt and decrypt rountrip
+        full encrypt and decrypt roundtrip
         using aes128gcm
     } -body {
         set data "Encryptiontest"
@@ -390,7 +390,7 @@ namespace eval webpush {
     } -result {Encryptiontest}
 
     test decrypt-aes128gcm-1.1  {
-        full encrypt and decrypt rountrip with UTF-8 characters
+        full encrypt and decrypt roundtrip with UTF-8 characters
         using aes128gcm
     } -body {
         set data [encoding convertto utf-8 "test with UTF-8: äüö - 10 € and a black sun ☀"]
