@@ -8,6 +8,21 @@ namespace eval webpush {
     set version 0.1
 
     #
+    # Padding of messages is optional, but recommended for security
+    # reasons. Some clients (e.g. Firefox on Android) seems to have
+    # problems with padding. See:
+    # https://sourceforge.net/p/naviserver/mailman/naviserver-devel/thread/38b9e2a0-904b-3b37-7add-ae09ab28f451%40digital-concepts.com/#msg36890700
+    # https://github.com/mozilla-services/autopush/issues/748)
+    #
+    # To configure, set the parameter
+    #
+    #    ns/server/$server/module/nswebpush {
+    #       ns_param dopadding 1 ;# default 0
+    #    }
+    #
+    set doPadding [ns_config ns/server/[ns_info server]/module/nswebpush dopadding 0]
+
+    #
     #  webpush::send
     #
     nsf::proc send {
@@ -349,10 +364,14 @@ namespace eval webpush {
         #
 
         if {$mode eq "aesgcm"} {
-            #
-            # maximum size for aesgcm is 4078
-            #
-            set paddingLength [expr {4078 - [string length $data]}]
+            if {$::webpush::doPadding} {
+                #
+                # Maximum block size for aesgcm is 4078
+                #
+                set paddingLength [expr {4078 - [string length $data]}]
+            } else {
+                set paddingLength 0
+            }
 
             #
             # The first two bytes of the padding indicate how many
@@ -362,13 +381,16 @@ namespace eval webpush {
             return [binary format Sx${paddingLength}A* $paddingLength $data]
 
         } elseif {$mode eq "aes128gcm"} {
-            #
-            # Set maximum padding length: maximum length(4096 - 86 for
-            # header) - 16 for the cipher tag - 1 for the delimiter
-            # byte.
-            #
-            set paddingLength [expr {4010 - 16 - 1 - [string length $data]}]
-            #ns_log notice "=========================================================== aes128gcm"
+            if {$::webpush::doPadding} {
+                #
+                # Set maximum padding length: maximum length(4096 - 86 for
+                # header) - 16 for the cipher tag - 1 for the delimiter
+                # byte.
+                #
+                set paddingLength [expr {4010 - 16 - 1 - [string length $data]}]
+            } else {
+                set paddingLength 0
+            }
             return [binary format A*cx${paddingLength} $data 2]
 
         } else {
