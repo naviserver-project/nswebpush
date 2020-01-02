@@ -5,7 +5,7 @@ namespace eval webpush {
     #
     # Version number of this module.
     #
-    set version 0.1
+    set version 0.2
 
     #
     # Padding of messages is optional, but recommended for security
@@ -17,10 +17,10 @@ namespace eval webpush {
     # To configure, set the parameter
     #
     #    ns/server/$server/module/nswebpush {
-    #       ns_param dopadding 1 ;# default 0
+    #       ns_param nopadding true ;# default false
     #    }
     #
-    set doPadding [ns_config ns/server/[ns_info server]/module/nswebpush dopadding 0]
+    set noPadding [ns_config ns/server/[ns_info server]/module/nswebpush nopadding false]
 
     #
     #  webpush::send
@@ -34,6 +34,7 @@ namespace eval webpush {
         {-mode aesgcm}
         {-timeout 5.0}
         {-ttl 0}
+        {-nopadding:switch}
     } {
         #
         # Send a push notification to the specified substription endpoint
@@ -65,7 +66,10 @@ namespace eval webpush {
         #        (POST request)
         #
         # @param ttl is the time to live of the push message
-
+        #
+        # @param nopadding switch to deactivate padding of messages per call.
+        #        Otherwise, the configured default value is used.
+        #
         if {$mode ni {aesgcm aes128gcm}} {
             error "Unknown GCM mode"
         }
@@ -160,7 +164,8 @@ namespace eval webpush {
                               -auth [ns_base64urldecode -binary [dict get $subscription auth]] \
                               -p256dh [ns_base64urldecode -binary [dict get $subscription p256dh]] \
                               -salt $salt \
-                              -mode $mode]
+                              -mode $mode \
+                              -nopadding=$nopadding]
             #
             # The temporary local private key is used only once for a single push message.
             # Hence it can be deleted here
@@ -356,7 +361,7 @@ namespace eval webpush {
                     32]
     }
 
-    proc padData {mode data} {
+    nsf::proc padData {-nopadding:switch mode data} {
         #
         # Fill the data with maximum padding according to the mode.
         #
@@ -364,13 +369,13 @@ namespace eval webpush {
         #
 
         if {$mode eq "aesgcm"} {
-            if {$::webpush::doPadding} {
+            if {$nopadding || $::webpush::noPadding} {
+                set paddingLength 0
+            } else {
                 #
                 # Maximum block size for aesgcm is 4078
                 #
                 set paddingLength [expr {4078 - [string length $data]}]
-            } else {
-                set paddingLength 0
             }
 
             #
@@ -381,15 +386,15 @@ namespace eval webpush {
             return [binary format Sx${paddingLength}A* $paddingLength $data]
 
         } elseif {$mode eq "aes128gcm"} {
-            if {$::webpush::doPadding} {
+            if {$nopadding || !$::webpush::noPadding} {
+                set paddingLength 0
+            } else {
                 #
                 # Set maximum padding length: maximum length(4096 - 86 for
                 # header) - 16 for the cipher tag - 1 for the delimiter
                 # byte.
                 #
                 set paddingLength [expr {4010 - 16 - 1 - [string length $data]}]
-            } else {
-                set paddingLength 0
             }
             return [binary format A*cx${paddingLength} $data 2]
 
@@ -417,6 +422,7 @@ namespace eval webpush {
         -p256dh
         -salt
         -mode
+        -nopadding:switch
     } {
         #ns_log notice "obj(data) [nsf::__db_get_obj $data]"
         #ns_log notice "string length data: [string length $data]"
@@ -457,7 +463,7 @@ namespace eval webpush {
                         -iv $nonce \
                         -key $key \
                         -encoding binary \
-                        [padData $mode $data]]
+                        [padData -nopadding=$nopadding $mode $data]]
         #
         # aes128gcm requires the header to be sent in the payload
         #
