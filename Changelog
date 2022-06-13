@@ -1,0 +1,651 @@
+commit 1730094b10e6a5e72c73ae9025525dc2d12a6807
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2020-01-03
+
+    Added a per-message deactivation of padding, and changed the config parameter to the same name
+
+M	webpush-procs.tcl
+
+commit ea4ccfd9adf82a6abe63c7d67df58bc8802c1ecc
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2020-01-02
+
+    Added parameter "dopadding" to improve compatibility with Firefox on Android.
+    It does not support padding. Many thanks to Wolfgang Winkler for reporting.
+    
+    https://github.com/mozilla-services/autopush/issues/748
+    https://sourceforge.net/p/naviserver/mailman/naviserver-devel/thread/38b9e2a0-904b-3b37-7add-ae09ab28f451%40digital-concepts.com/#msg36890700
+
+M	tests/webpush.test
+M	webpush-procs.tcl
+
+commit ca0ab636d018c78dd91f852a433e73ed31d0a760
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2019-12-13
+
+    improve spelling
+
+M	tests/webpush.test
+
+commit 4643c2de10755aacfd7ca79352c8921153a272a5
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2019-12-13
+
+    improve spelling
+
+M	demo/report.html
+
+commit c071daa6a2a06d7000eacbe913743ef4f81dd1e9
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2019-08-19
+
+    always use binary format for appending (it does not seem necessary here, but it is used for consistency)
+
+M	webpush-procs.tcl
+
+commit 6c6095ea9377a13c9d3466366be698b1ff6fdaef
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2019-08-19
+
+    extend test cases to include UTF-8 characters
+
+M	tests/webpush.test
+
+commit 9a239ad573ae2c2f7487e09b24004f84eaaedb2a
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2019-08-18
+
+    make code binary-proof for Tcl 8.5
+
+M	tests/webpush.test
+M	webpush-procs.tcl
+
+commit 976708c61659e55945761c50ce6c03750124ecbb
+Merge: 13d97aa 7babb7a
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2019-08-17
+
+    merge
+
+commit 13d97aac8d10c3c5933306c292e67d61f6db0c3f
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2019-08-17
+
+    adapt code for current version of NaviServer and use better Tcl idioms
+
+M	tests/webpush.test
+M	webpush-procs.tcl
+
+commit 7babb7a250df87dcb8ea5d975e73ff68e5db2d9d
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-19
+
+    added comment about testing endpoint
+
+M	README
+
+commit e9b7a5fd364255e5a83492c87a4e0aa216ae18f9
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-18
+
+    some more tcl coding cleanups
+    prefer whitespace over tabs
+
+M	demo/webpush-demo.tcl
+
+commit 60d9c7099bf34d8e216a24c7d5dbd9d61d385888
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-18
+
+    README edited online with Bitbucket
+
+M	README
+
+commit 0ac68b607f00e3e54287d5827baa434641b7a908
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-18
+
+    README edited online with Bitbucket
+
+M	README
+
+commit ab59fc8319ba7d706ee17344c2a444e3b744892f
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-15
+
+    - improve Tcl code
+    - improve documentation
+
+M	Makefile
+M	webpush-procs.tcl
+
+commit f22a2f1e850df37f9ef5da3ba7c0dd282ffcd84b
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-15
+
+    improve dictToJson:
+    - properly escape double quotes in JSON
+    - use a more regular structure for building compact JSON (list + join)
+
+M	webpush-procs.tcl
+
+commit 9f2f02c199eff53a47bd577e4ddf9f6cd4ed7967
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-13
+
+    add RFC 8292 as reference for VAPID
+
+M	demo/report.html
+
+commit 84101b19d25f3314c19ebc1bad48b8ef93aa9fb3
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-13
+
+    fix filename
+
+M	Makefile
+
+commit a348d5d923b5f5ccb9198f6883d84670db8d6af3
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-13
+
+    import into mercurial
+    changed name to nswebpush
+    added README, Makefile, etc.
+    adjusted paths
+    added regular NaviServer test setup
+
+A	LICENSE
+A	Makefile
+A	README
+R100	styles/index.css	demo/index.css
+R100	index.tcl	demo/index.tcl
+R100	prime256v1_key.pem	demo/prime256v1_key.pem
+R100	Report.html	demo/report.html
+R100	sw.js	demo/sw.js
+R096	webpush-demo.tcl	demo/webpush-demo.tcl
+R100	webpush-send.png	demo/webpush-send.png
+R100	webpush-subscribe.png	demo/webpush-subscribe.png
+R100	webpush.js	demo/webpush.js
+D	images/badge.png
+D	images/icon.png
+D	index-codelab.html
+D	scripts/main.js
+D	test.js
+A	tests/all.tcl
+A	tests/config.tcl
+R097	TestSuite.tcl	tests/webpush.test
+R099	webpush.tcl	webpush-procs.tcl
+D	webpushDemo.tcl
+
+commit 520db58cb2fa1077d526b821318611a219ca2a7e
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-10
+
+    update graphic
+
+M	webpush-send.png
+
+commit 1b1c328d2acfe41931165aee11df2044b61ddf06
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-09
+
+    delete temporary private key after encryption
+
+M	webpush.tcl
+
+commit 58d1b1e2d7e1c3542c81f270b477bef41d217154
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-09
+
+    removed text about service worker unsubscription
+
+M	webpush-demo.tcl
+
+commit f51e951b3057a57be068c2525bd0afcfb6862326
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-09
+
+    added unsubscribe
+
+M	webpush.js
+
+commit a91a0e1ac58a9b9410c9bf31627497f78b3c2c93
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-09
+
+    add W3C draft for Web Push
+
+M	Report.html
+
+commit 2ba83e4d161294f13389bb885ed1f548c3bf2772
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-09
+
+    provide a link between the demo and the report
+
+M	Report.html
+M	webpush-demo.tcl
+
+commit 172fc65a23f3a3e161440256c37cf7aeaacc37b1
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-09
+
+    add some RFCs to Report
+
+M	Report.html
+
+commit 0cc08648ef90c442dbd166650b61f4294d5892e6
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-09
+
+    improve .png file
+
+M	webpush-subscribe.png
+
+commit a272e7bb947f08605c1601754cd6a04e9ec17a2e
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-09
+
+    updated demo
+
+R100	index.html	index-codelab.html
+A	index.tcl
+A	webpush-demo.tcl
+A	webpush-send.png
+A	webpush-subscribe.png
+A	webpush.js
+
+commit 5875b189c8d10202230e5c975a62caee6fa0c3b6
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-09
+
+    - new function createTmpPrivateKeyPem (necessary for concurrency)
+      another option would be to create fresh key pairs not as files, but to pass theses as strings around.
+      we would need for all function in the C-API the option to pass private keys as strings as well
+    - cleanup of temporary files in test suite
+
+M	TestSuite.tcl
+M	webpush.tcl
+
+commit e8404cd0b6c0358a8c55b74a9e519522374d8a99
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-09
+
+    adapt labels
+
+M	sw.js
+
+commit 881883d3f492edc7e7fb9d7010ddee2377dc47ea
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-08
+
+    added encryption documentation
+
+M	Report.html
+
+commit 8d4d32f6820bdb18fd951aa0433494b11b7dbac2
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-08
+
+    fixed padding bug
+
+M	webpush.tcl
+
+commit 70c8157bef5c80b1388ade477fd3e5ac7ccef8d7
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-08
+
+    Moved endpoint that is used in tests to start of script
+
+M	TestSuite.tcl
+
+commit 5f0ef2a7bf39dfac7953cab8597fa053dc632489
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-07
+
+    comment suspicious code fragment
+
+M	webpush.tcl
+
+commit a29450471e54115862751f467d3b350af8562ebc
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-06
+
+    - make sure, the .pem file is taken always from the demo directory
+    - improve error handling (provide errors in the demo page, etc)
+    - improve layout and input fields (use mdl similar to the index page)
+    - make the demo page self-explaining
+    improve layout
+
+M	webpushDemo.tcl
+
+commit a3644a4a84dee9b84903943f838e398af718191d
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-06
+
+    whitespace changes
+
+M	webpush.tcl
+
+commit 6afa1d205557ba33dc7397be2b1112491f2b80d2
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-06
+
+    minor changes (formulations, typesetting)
+
+M	Report.html
+
+commit 9a2b2a1b43d463574dc084a20c430fb751f22596
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-06
+
+    make sure, the test source uses the .pem file of the repo. This fixes the regression test.
+
+M	TestSuite.tcl
+
+commit 6eaa0b97027163cafe67b7dc097cd8fcebb83b1a
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-05
+
+    removed test for function that was removed
+
+M	TestSuite.tcl
+
+commit 04d5c969215771093ae029c451672c4a65a92bd8
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-05
+
+    load - for the time being - webpush.tcl from the same directory as the calling script
+
+M	webpushDemo.tcl
+
+commit fb0197366004dd95e1d5662d0b143762951a6291
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-05
+
+    fix merge bug
+
+M	webpush.tcl
+
+commit e9b15a387285cfca853eed1eb68d0694c1efca53
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-05
+
+    - load webpush API always relative to the caller (required for OpenACS), will be removed later
+    - provide test numbering
+    - ease indentation
+    - always quote "expr" for bytecode compilation
+
+M	TestSuite.tcl
+
+commit bd75c22251389dd10ecc830d2a69c727a6689d68
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-05
+
+    fix some merge bugs
+
+M	Report.html
+M	webpush.tcl
+
+commit a0c471dce7f6157f118505eaf5084e4fa2bbd573
+Merge: bcff15e d79092d
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-05
+
+    Merge branch 'master' of https://bitbucket.org/Gepro83/pushnotificationsapi
+
+commit bcff15eca3205fe4337e0b633886eb1973bb576e
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-05
+
+    change "encoding" for GCM mode to "mode" to avoid confusion with other uses of encoding such as "binary" or "base64url", ...
+
+M	Report.html
+M	webpush.tcl
+
+commit d79092d9187426dc75907e87e38e936a902e208e
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-08-05
+
+    added non-positional args for encrypt and decrypt
+
+M	TestSuite.tcl
+M	webpush.tcl
+
+commit b5bfa809d4bb52ad312f23124ff282a37efa61b0
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-04
+
+    use a namespace rather than global commands, prefer non-positional arguments for "public" functions.
+
+M	Report.html
+M	TestSuite.tcl
+M	webpush.tcl
+
+commit edc6e64625e12553d38069868b00095c781c1a09
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-04
+
+    improve code typesetting and prefer "Web Push" similar to RFC
+
+M	Report.html
+
+commit 3f6b3f6c981ad93d33b5cf195ad228657cb16e8f
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-04
+
+    use usual camel case capitalization for NaviServer
+
+M	Report.html
+
+commit 96e0c8bccc35e16cb13b18f8d59ff22e8d0151c8
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-08-04
+
+    improve spelling
+
+M	Report.html
+M	TestSuite.tcl
+M	webpush.tcl
+M	webpushDemo.tcl
+
+commit 9418cd06f20e62884aa3dbf794ba8106baf990ef
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-07-17
+
+    added a simple demo
+
+A	webpushDemo.tcl
+
+commit eb7bbee0acd61f45aa8f43b45184a84748082a80
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-07-17
+
+    added localKeyPath parameter to webpush function
+
+M	Report.html
+M	TestSuite.tcl
+M	webpush.tcl
+
+commit 9a928575a919ccb52deb93545d20ec5b9b1b2381
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-07-17
+
+    added report
+
+A	Report.html
+
+commit 45752ce90311e1a71f655b1cf03c14c11b007a80
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-07-17
+
+    cleaned up api
+
+M	TestSuite.tcl
+M	webpush.tcl
+
+commit 14a912959065baa448c8d5a6eb99d5b56f2f0438
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-07-17
+
+    aes128gcm decrypt working. renamed file
+
+R100	vapid.tcl	webpush.tcl
+
+commit 7cbb0eb9bbdabab63b8807a59bd2f9c39a23f7ec
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-07-07
+
+    aes128gcm encryption working
+
+M	TestSuite.tcl
+M	vapid.tcl
+
+commit ca78eb73a25a9785752cd59f73fad0d4f80a754c
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-07-06
+
+    Fixed issue with fcm endpoints
+
+M	TestSuite.tcl
+M	vapid.tcl
+
+commit 0735dbe197664d23b512da933fb4017f237f038c
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-06-14
+
+    the private key used in TestSuite.tcl - needs to be moved to /ns/modules/vapid
+
+A	prime256v1_key.pem
+
+commit e9cc61671130289d70dfc6129f4631e2f1ae6c86
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-06-14
+
+    decryption added, aes128gcm started - not working yet
+
+M	TestSuite.tcl
+M	test.js
+M	vapid.tcl
+
+commit 01b42c366d48af1dac2e149c86b13bb05310d891
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-30
+
+    added padding, testclient displays push with payload
+
+M	TestSuite.tcl
+M	sw.js
+M	test.js
+M	vapid.tcl
+
+commit 764cd051fbd02add4fee9d6fc8c39b5f84a347d3
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-28
+
+    Push with payload working with positive status code - no notification currently
+
+M	vapid.tcl
+
+commit e690ca7ab47881070983d73ccfdc250d2fc7e983
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-28
+
+    encryption working
+
+M	TestSuite.tcl
+M	vapid.tcl
+
+commit 75141dfa5b06799ad19739376c6e1381ba133bbf
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-28
+
+    added nodejs version of encryption for testing
+
+A	test.js
+
+commit becf95cbd9c39ae740112bf937da40f5aac9d608
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-20
+
+    added generateInfo for key a nonce generation
+
+M	TestSuite.tcl
+M	vapid.tcl
+
+commit 9db22eec881b7755976c18a883b65ec24438d58a
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-14
+
+    Started data bearing push
+
+M	TestSuite.tcl
+M	vapid.tcl
+
+commit a4acb9df95d210cb183cd86b75aeb8dd4b34c6fb
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-07
+
+    Infrastructure for simple push done. Moved testsuite to extra file
+
+A	TestSuite.tcl
+M	vapid.tcl
+
+commit c55ea20186a7ba1eb5d4ace58b0ccddd3891dde9
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-02
+
+    started infrastructure for webpush
+
+M	scripts/main.js
+M	sw.js
+M	vapid.tcl
+
+commit 323c0e34f37df840ff12da4fb51e0dfc36909b37
+Author: Georg Prohaska <h0325904@wu.ac.at>
+Date:   2018-05-01
+
+    removed unnecessary key files
+
+D	scep256k1.pem
+D	secp256k1-key.pem
+D	vapid_private.pem
+D	vapid_public.pem
+
+commit e30bc1f59f54a5def2d14f6417da4b775b726a12
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2018-04-27
+
+    adjust to updated interface
+    minor cleanup
+    ihttps://jwt.io/ signature test works now with the updated version of naviserver
+
+M	vapid.tcl
+
+commit 43d29d2d0db5e96baffcf1bf6281a5ba20f039f4
+Author: Georg Prohaska <h0325904@wuc.ac.at>
+Date:   2018-04-26
+
+    updated vapid.tcl to test signature
+
+M	vapid.tcl
+
+commit 596e23762143e9206105741b565337984e8f474a
+Author: Georg Prohaska <h0325904@wuc.ac.at>
+Date:   2018-04-17
+
+    initial commit
+
+A	.eslintrc
+A	images/badge.png
+A	images/icon.png
+A	index.html
+A	scep256k1.pem
+A	scripts/main.js
+A	secp256k1-key.pem
+A	styles/index.css
+A	sw.js
+A	vapid.tcl
+A	vapid_private.pem
+A	vapid_public.pem
