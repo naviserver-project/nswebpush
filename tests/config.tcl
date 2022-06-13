@@ -1,5 +1,5 @@
 #
-# Simple configuration file for testing of the nswebpush tcl module
+# Simple configuration file for testing of the nswebpush Tcl module
 #
 
 set homedir [pwd]/tests
