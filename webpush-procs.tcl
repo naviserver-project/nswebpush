@@ -5,7 +5,7 @@ namespace eval webpush {
     #
     # Version number of this module.
     #
-    set version 0.2
+    set version 0.3
 
     #
     # Padding of messages is optional, but recommended for security
@@ -615,7 +615,11 @@ namespace eval webpush {
         dict for {key value} $dict {
             regsub -all \" $key "\\\"" key
             regsub -all \" $value "\\\"" value
-            lappend pairs [subst {"$key":"$value"}]
+            if { $key eq "exp"} {
+                lappend pairs [subst {"$key":$value}]
+            } else {
+                lappend pairs [subst {"$key":"$value"}]
+            }
         }
         return "{[join $pairs ,]}"
     }
