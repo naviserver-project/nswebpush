@@ -33,7 +33,7 @@ namespace eval webpush {
         -localKeyPath
         {-mode aesgcm}
         {-timeout 5.0}
-        {-ttl 0}
+        {-ttl 60}
         {-nopadding:switch}
     } {
         #
