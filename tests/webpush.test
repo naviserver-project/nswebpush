@@ -1,6 +1,8 @@
 package require tcltest
 package require json
 
+tcltest::configure -verbose start
+
 #
 # For testing purposes, we use the module source directory, the place
 # where "make test" is to be executed. Furthermore, we use for testing
@@ -8,7 +10,7 @@ package require json
 #
 set scriptDir [pwd]/..
 source $scriptDir/webpush-procs.tcl
-ns_log notice "script $scriptDir/webpush.tcl was loaded"
+#ns_log notice "script $scriptDir/webpush.tcl was loaded"
 
 set ::vapidCertPath $scriptDir/demo
 

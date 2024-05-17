@@ -145,7 +145,7 @@ namespace eval webpush {
                 # The encryption header contains the salt also used
                 # for encryption encoded in base64url format.
                 #
-                set encryption "keyid=p256dh;salt=[ns_base64urlencode $salt]"
+                set encryption "salt=[ns_base64urlencode $salt]"
                 ns_set update $headers "encryption" $encryption
             }
 
