@@ -33,7 +33,7 @@ namespace eval webpush {
         -localKeyPath
         {-mode aesgcm}
         {-timeout 5.0}
-        {-ttl 0}
+        {-ttl 60}
         {-nopadding:switch}
     } {
         #
@@ -349,7 +349,7 @@ namespace eval webpush {
         # mode.
         #
         if {$mode eq "aes128gcm"} {
-            set authInfo [binary format A*xA* "WebPush: info" $ServerPubKey]
+            set authInfo [binary format A*xA*A* "WebPush: info" $p256dh $ServerPubKey]
         } else {
             set authInfo [binary format A*x "Content-Encoding: auth"]
         }
