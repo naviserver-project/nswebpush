@@ -1,3 +1,26 @@
+commit 4b374c9f104799c24587af381bc4ff81fd7a614a
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2023-08-09
+
+    provide value for "exp" as a numeric literal
+
+    Google firebase changed the implementation on Aug 2,
+    stopping to accept quoted values for the "exp" field
+    in JSON.
+
+    Many thanks to David Osborne for figuring this out and
+    providing a fix.
+
+M	webpush-procs.tcl
+
+commit 1e412c76626b29a4573b595a069a8ea10feece8a
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2022-06-13
+
+    improve spelling
+
+M	tests/config.tcl
+
 commit 1ad8d15a8e2d765699338129a66d84acd31e5837
 Author: Gustaf Neumann <neumann@wu-wien.ac.at>
 Date:   2022-06-13
@@ -20,7 +43,7 @@ Date:   2020-01-02
 
     Added parameter "dopadding" to improve compatibility with Firefox on Android.
     It does not support padding. Many thanks to Wolfgang Winkler for reporting.
-    
+
     https://github.com/mozilla-services/autopush/issues/748
     https://sourceforge.net/p/naviserver/mailman/naviserver-devel/thread/38b9e2a0-904b-3b37-7add-ae09ab28f451%40digital-concepts.com/#msg36890700
 
@@ -269,7 +292,7 @@ Author: Gustaf Neumann <neumann@wu-wien.ac.at>
 Date:   2018-08-09
 
     - new function createTmpPrivateKeyPem (necessary for concurrency)
-      another option would be to create fresh key pairs not as files, but to pass theses as strings around.
+      another option would be to create fresh key pairs not as files, but to pass these as strings around.
       we would need for all function in the C-API the option to pass private keys as strings as well
     - cleanup of temporary files in test suite
 

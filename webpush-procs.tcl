@@ -5,7 +5,7 @@ namespace eval webpush {
     #
     # Version number of this module.
     #
-    set version 0.3
+    set ::webpush::version 0.3
 
     #
     # Padding of messages is optional, but recommended for security
@@ -20,7 +20,7 @@ namespace eval webpush {
     #       ns_param nopadding true ;# default false
     #    }
     #
-    set noPadding [ns_config ns/server/[ns_info server]/module/nswebpush nopadding false]
+    set ::webpush::noPadding [ns_config ns/server/[ns_info server]/module/nswebpush nopadding false]
 
     #
     #  webpush::send

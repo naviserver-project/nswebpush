@@ -266,7 +266,7 @@ pre {color: #e83e8c;}
       -p256dh /p256dh/ \
       -salt /salt/ \
       -mode /mode/</pre></p>
-<p>This function encrypts the data using a private key in form of a pem file, the auth secret, the client public key (<code>p256dh</code>) and a salt value. <code>auth, p256dh, salt</code> are expected in binary format. Currently "aesgcm" and "aes128gcm" are supportet content encryption modes. The encrypted data is returned in binary format.</p>
+<p>This function encrypts the data using a private key in form of a pem file, the auth secret, the client public key (<code>p256dh</code>) and a salt value. <code>auth, p256dh, salt</code> are expected in binary format. Currently "aesgcm" and "aes128gcm" are supported content encryption modes. The encrypted data is returned in binary format.</p>
 
     <h3>Decryption</h3>
     <p>If you want to write your own client or want to use this encryption scheme for other purposes you can also use our API to decrypt messages using the following function:
