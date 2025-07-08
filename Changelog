@@ -1,13 +1,47 @@
+commit 443c0d3b942af5928144ec12b827a287ae753c2d
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2024-11-03
+
+    improved Tcl9 compatibility
+
+M	demo/report.html
+M	webpush-procs.tcl
+
+commit ff39c03b1906972896f5ff7f07821c35d65dd7d3
+Author: Gustaf Neumann <neumann@wu-wien.ac.at>
+Date:   2024-05-17
+
+    removed "keyid=p256dh" from encryption header
+
+M	tests/webpush.test
+M	webpush-procs.tcl
+
+commit 2cf7e1cc80d2b5e81a9c70446924d27bd4e436c6
+Author: Priyank <priyank@qcode.co.uk>
+Date:   2024-05-14
+
+    Update webpush-procs.tcl
+
+M	webpush-procs.tcl
+
+commit e62646cdccf2b0d7cb42130569e8c00dacb35de9
+Author: Priyank <priyank@qcode.co.uk>
+Date:   2024-05-14
+
+    Bug fix for makeIkm proc for mode aes128gcm
+
+M	webpush-procs.tcl
+
 commit 4b374c9f104799c24587af381bc4ff81fd7a614a
 Author: Gustaf Neumann <neumann@wu-wien.ac.at>
 Date:   2023-08-09
 
     provide value for "exp" as a numeric literal
-
+    
     Google firebase changed the implementation on Aug 2,
     stopping to accept quoted values for the "exp" field
     in JSON.
-
+    
     Many thanks to David Osborne for figuring this out and
     providing a fix.
 
@@ -43,7 +77,7 @@ Date:   2020-01-02
 
     Added parameter "dopadding" to improve compatibility with Firefox on Android.
     It does not support padding. Many thanks to Wolfgang Winkler for reporting.
-
+    
     https://github.com/mozilla-services/autopush/issues/748
     https://sourceforge.net/p/naviserver/mailman/naviserver-devel/thread/38b9e2a0-904b-3b37-7add-ae09ab28f451%40digital-concepts.com/#msg36890700
 
@@ -292,7 +326,7 @@ Author: Gustaf Neumann <neumann@wu-wien.ac.at>
 Date:   2018-08-09
 
     - new function createTmpPrivateKeyPem (necessary for concurrency)
-      another option would be to create fresh key pairs not as files, but to pass these as strings around.
+      another option would be to create fresh key pairs not as files, but to pass theses as strings around.
       we would need for all function in the C-API the option to pass private keys as strings as well
     - cleanup of temporary files in test suite
 

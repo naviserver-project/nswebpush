@@ -105,8 +105,8 @@ namespace eval webpush {
         # start creating headers
         #
         set headers [ns_set create]
-        ns_set update $headers "authorization" $authorization
-        ns_set update $headers "ttl" $ttl
+        ns_set iupdate $headers "authorization" $authorization
+        ns_set iupdate $headers "ttl" $ttl
 
         #
         # data bearing push messages need "auth" and "p256dh" fields
@@ -139,21 +139,21 @@ namespace eval webpush {
                 # expect it.
                 #
                 set cryptokey "dh=$localPubKey;keyid=p256dh"
-                ns_set update $headers "crypto-key" $cryptokey
+                ns_set iupdate $headers "crypto-key" $cryptokey
 
                 #
                 # The encryption header contains the salt also used
                 # for encryption encoded in base64url format.
                 #
                 set encryption "salt=[ns_base64urlencode $salt]"
-                ns_set update $headers "encryption" $encryption
+                ns_set iupdate $headers "encryption" $encryption
             }
 
             #
             # Set content-encoding and content-type headers.
             #
-            ns_set update $headers "content-encoding" $mode
-            ns_set update $headers "content-type" application/octet-stream
+            ns_set iupdate $headers "content-encoding" $mode
+            ns_set iupdate $headers "content-type" application/octet-stream
 
             #
             # encrypt the data
@@ -174,7 +174,7 @@ namespace eval webpush {
             #
             # content-length header is the length of the encrypted data in bytes
             #
-            ns_set update $headers "content-length" [string length $encrData]
+            ns_set iupdate $headers "content-length" [string length $encrData]
 
             #
             # send the request
@@ -185,7 +185,7 @@ namespace eval webpush {
                          -body $encrData \
                          $endpoint]
         } else {
-            ns_set update $headers "content-type" "application/octet-stream"
+            ns_set iupdate $headers "content-type" "application/octet-stream"
             #
             # Push messages without a payload do not have a request body
             #
